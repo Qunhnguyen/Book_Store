@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}BookStore - Vận chuyển{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">Trang chủ</a></li>
+        <li class="breadcrumb-item active">Vận chuyển - Đơn hàng {{ order_id }}</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="page-header d-flex justify-content-between align-items-center">
+            <h1><i class="bi bi-truck me-2"></i>Vận chuyển - Đơn hàng #{{ order_id }}</h1>
+            <a href="/payments-ui/{{ order_id }}/" class="btn btn-outline-success">
+                <i class="bi bi-credit-card me-1"></i>Xem thanh toán
+            </a>
+        </div>
+
+        {% if shipments %}
+        <div class="row g-3">
+            {% for shipment in shipments %}
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-box-seam me-1"></i>Vận chuyển #{{ shipment.id }}
+                            </h5>
+                            {% if shipment.status == "PENDING" %}
+                                <span class="badge bg-warning text-dark">Chờ xử lý</span>
+                            {% elif shipment.status == "SHIPPED" %}
+                                <span class="badge bg-info">Đang giao</span>
+                            {% elif shipment.status == "DELIVERED" %}
+                                <span class="badge bg-success">Đã giao</span>
+                            {% else %}
+                                <span class="badge bg-secondary">{{ shipment.status }}</span>
+                            {% endif %}
+                        </div>
+                        <ul class="list-unstyled">
+                            <li class="mb-2">
+                                <i class="bi bi-receipt me-2 text-muted"></i>
+                                <strong>Đơn hàng:</strong> #{{ shipment.order_id }}
+                            </li>
+                            <li class="mb-2">
+                                <i class="bi bi-truck me-2 text-muted"></i>
+                                <strong>Phương thức:</strong>
+                                {% if shipment.shipping_method == "STANDARD" %}
+                                    <span class="badge bg-info">Tiêu chuẩn</span>
+                                {% elif shipment.shipping_method == "EXPRESS" %}
+                                    <span class="badge bg-danger">Nhanh</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ shipment.shipping_method }}</span>
+                                {% endif %}
+                            </li>
+                            <li class="mb-2">
+                                <i class="bi bi-geo-alt me-2 text-muted"></i>
+                                <strong>Địa chỉ:</strong> {{ shipment.address }}
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="card">
+            <div class="empty-state">
+                <i class="bi bi-truck d-block"></i>
+                <h5>Chưa có thông tin vận chuyển</h5>
+                <p class="text-muted">Đơn hàng này chưa có thông tin vận chuyển</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h6 class="mb-0"><i class="bi bi-arrow-right-circle me-1"></i>Xem vận chuyển khác</h6>
+            </div>
+            <div class="card-body">
+                <form id="switchShipmentForm">
+                    <div class="input-group">
+                        <input type="number" class="form-control" id="switchShipmentOrderId" placeholder="ID đơn hàng" min="1">
+                        <button class="btn btn-info text-white" type="button" data-navigate-btn data-navigate-input="switchShipmentOrderId" data-navigate-url="/shipments-ui/{id}/">
+                            <i class="bi bi-arrow-right"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-body">
+                <h6><i class="bi bi-link-45deg me-1"></i>Liên kết nhanh</h6>
+                <div class="d-grid gap-2">
+                    <a href="/payments-ui/{{ order_id }}/" class="btn btn-outline-success btn-sm">
+                        <i class="bi bi-credit-card me-1"></i>Xem thanh toán đơn #{{ order_id }}
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

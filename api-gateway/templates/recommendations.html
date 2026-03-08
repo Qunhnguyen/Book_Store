@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}BookStore - Gợi ý sách{% endblock %}
+{% block nav_recommendations %}active{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">Trang chủ</a></li>
+        <li class="breadcrumb-item active">Gợi ý sách</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="page-header text-center mb-4">
+    <h1><i class="bi bi-stars me-2"></i>Sách được gợi ý bởi AI</h1>
+    <p class="text-muted">Hệ thống AI đề xuất những cuốn sách tốt nhất cho bạn</p>
+</div>
+
+{% if recommendations %}
+<div class="row g-4 justify-content-center">
+    {% for book in recommendations %}
+    <div class="col-lg-4 col-md-6">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <div class="mb-3">
+                    <i class="bi bi-book" style="font-size: 3rem; color: #3498db;"></i>
+                </div>
+                <h5 class="card-title">{{ book.title }}</h5>
+                <p class="text-muted mb-2">
+                    <i class="bi bi-person me-1"></i>{{ book.author }}
+                </p>
+                <div class="mb-2">
+                    <span class="badge bg-success fs-6">{{ book.price }} VNĐ</span>
+                </div>
+                <div class="mb-3">
+                    {% if book.stock > 0 %}
+                        <span class="badge bg-info">Còn {{ book.stock }} cuốn</span>
+                    {% else %}
+                        <span class="badge bg-danger">Hết hàng</span>
+                    {% endif %}
+                </div>
+                <a href="/reviews-ui/{{ book.id }}/" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-chat-dots me-1"></i>Xem đánh giá
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card">
+    <div class="empty-state">
+        <i class="bi bi-stars d-block"></i>
+        <h5>Chưa có gợi ý nào</h5>
+        <p class="text-muted">Hệ thống AI chưa thể đưa ra gợi ý. Hãy thêm sách vào hệ thống trước.</p>
+        <a href="/books-ui/" class="btn btn-primary">
+            <i class="bi bi-book me-1"></i>Xem sách
+        </a>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

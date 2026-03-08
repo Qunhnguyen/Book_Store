@@ -1,13 +1,13 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 
-{% block title %}BookStore - Sách{% endblock %}
-{% block nav_books %}active{% endblock %}
+{% block title %}BookStore - Nhân viên - Quản lý sách{% endblock %}
+{% block nav_manage %}active{% endblock %}
 
 {% block breadcrumb %}
 <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="/">Trang chủ</a></li>
-        <li class="breadcrumb-item active">Sách</li>
+        <li class="breadcrumb-item active">Nhân viên - Quản lý sách</li>
     </ol>
 </nav>
 {% endblock %}
@@ -16,8 +16,8 @@
 <div class="row">
     <div class="col-lg-8">
         <div class="page-header d-flex justify-content-between align-items-center">
-            <h1><i class="bi bi-book me-2"></i>Danh sách sách</h1>
-            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addBookModal">
+            <h1><i class="bi bi-person-workspace me-2"></i>Nhân viên - Quản lý sách</h1>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addStaffBookModal">
                 <i class="bi bi-plus-lg me-1"></i>Thêm sách
             </button>
         </div>
@@ -51,9 +51,12 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <a href="/reviews-ui/{{ book.id }}/" class="btn btn-sm btn-outline-info" title="Xem đánh giá">
-                                    <i class="bi bi-chat-dots"></i>
-                                </a>
+                                <form method="post" action="/staff-ui/delete/{{ book.id }}/" class="d-inline" data-confirm="Bạn có chắc chắn muốn xóa sách này?">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Xóa sách">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
                             </td>
                         </tr>
                         {% endfor %}
@@ -66,7 +69,7 @@
             <div class="empty-state">
                 <i class="bi bi-book d-block"></i>
                 <h5>Chưa có sách nào</h5>
-                <p class="text-muted">Hãy thêm sách mới vào hệ thống</p>
+                <p class="text-muted">Hãy thêm sách mới qua staff-service</p>
             </div>
         </div>
         {% endif %}
@@ -75,10 +78,10 @@
     <div class="col-lg-4">
         <div class="card">
             <div class="card-header bg-primary text-white">
-                <h6 class="mb-0"><i class="bi bi-plus-circle me-1"></i>Thêm sách mới</h6>
+                <h6 class="mb-0"><i class="bi bi-plus-circle me-1"></i>Thêm sách (Staff)</h6>
             </div>
             <div class="card-body">
-                <form method="post" action="/books-ui/">
+                <form method="post" action="/staff-ui/">
                     {% csrf_token %}
                     <div class="mb-3">
                         <label class="form-label fw-bold">Tên sách</label>
@@ -102,18 +105,29 @@
                 </form>
             </div>
         </div>
+
+        <div class="card mt-3">
+            <div class="card-body text-center">
+                <i class="bi bi-info-circle text-info d-block" style="font-size: 2rem;"></i>
+                <h6 class="mt-2">Thông tin</h6>
+                <p class="text-muted small">
+                    Trang này sử dụng <strong>Staff Service</strong> làm proxy để quản lý sách.
+                    Các thao tác CRUD được chuyển tiếp đến Book Service.
+                </p>
+            </div>
+        </div>
     </div>
 </div>
 
-<!-- Add Book Modal -->
-<div class="modal fade" id="addBookModal" tabindex="-1">
+<!-- Add Book via Staff Modal -->
+<div class="modal fade" id="addStaffBookModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-plus-circle me-1"></i>Thêm sách mới</h5>
+                <h5 class="modal-title"><i class="bi bi-plus-circle me-1"></i>Thêm sách (Staff)</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="post" action="/books-ui/">
+            <form method="post" action="/staff-ui/">
                 {% csrf_token %}
                 <div class="modal-body">
                     <div class="mb-3">
