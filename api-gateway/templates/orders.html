@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Orders UI</title>
+</head>
+<body>
+    <h1>Orders of Customer {{ customer_id }}</h1>
+    <ul>
+        {% for order in orders %}
+            <li>order_id: {{ order.id }} - status: {{ order.status }}</li>
+        {% empty %}
+            <li>No orders found.</li>
+        {% endfor %}
+    </ul>
+</body>
+</html>

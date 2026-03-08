@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Payments UI</title>
+</head>
+<body>
+    <h1>Payments of Order {{ order_id }}</h1>
+    <ul>
+        {% for payment in payments %}
+            <li>payment_id: {{ payment.id }} - method: {{ payment.payment_method }} - status: {{ payment.status }}</li>
+        {% empty %}
+            <li>No payments found.</li>
+        {% endfor %}
+    </ul>
+</body>
+</html>

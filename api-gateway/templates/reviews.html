@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Reviews UI</title>
+</head>
+<body>
+    <h1>Reviews of Book {{ book_id }}</h1>
+    <ul>
+        {% for review in reviews %}
+            <li>customer_id: {{ review.customer_id }} - rating: {{ review.rating }} - comment: {{ review.comment }}</li>
+        {% empty %}
+            <li>No reviews found.</li>
+        {% endfor %}
+    </ul>
+</body>
+</html>

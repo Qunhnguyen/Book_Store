@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Managers UI</title>
+</head>
+<body>
+    <h1>Managers</h1>
+    <ul>
+        {% for manager in managers %}
+            <li>{{ manager.name }} - {{ manager.email }}</li>
+        {% empty %}
+            <li>No managers found.</li>
+        {% endfor %}
+    </ul>
+</body>
+</html>

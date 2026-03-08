@@ -1,0 +1,17 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Cart UI</title>
+</head>
+<body>
+    <h1>Cart of Customer {{ customer_id }}</h1>
+    <ul>
+        {% for item in items %}
+            <li>book_id: {{ item.book_id }} - quantity: {{ item.quantity }}</li>
+        {% empty %}
+            <li>No cart items found.</li>
+        {% endfor %}
+    </ul>
+</body>
+</html>
