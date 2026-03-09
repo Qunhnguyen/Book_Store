@@ -1,17 +1,123 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Reviews UI</title>
-</head>
-<body>
-    <h1>Reviews of Book {{ book_id }}</h1>
-    <ul>
-        {% for review in reviews %}
-            <li>customer_id: {{ review.customer_id }} - rating: {{ review.rating }} - comment: {{ review.comment }}</li>
-        {% empty %}
-            <li>No reviews found.</li>
-        {% endfor %}
-    </ul>
-</body>
-</html>
+{% extends "base.html" %}
+
+{% block title %}BookStore - Đánh giá{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">Trang chủ</a></li>
+        <li class="breadcrumb-item"><a href="/books-ui/">Sách</a></li>
+        <li class="breadcrumb-item active">Đánh giá - Sách {{ book_id }}</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="page-header d-flex justify-content-between align-items-center">
+            <h1><i class="bi bi-chat-dots me-2"></i>Đánh giá - Sách #{{ book_id }}</h1>
+            <a href="/books-ui/" class="btn btn-outline-primary">
+                <i class="bi bi-arrow-left me-1"></i>Quay lại sách
+            </a>
+        </div>
+
+        {% if reviews %}
+        <div class="row g-3">
+            {% for review in reviews %}
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="d-flex align-items-center">
+                                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3" style="width: 45px; height: 45px; min-width: 45px;">
+                                    <i class="bi bi-person-fill"></i>
+                                </div>
+                                <div>
+                                    <h6 class="mb-0">Khách hàng #{{ review.customer_id }}</h6>
+                                    <small class="text-muted">Sách #{{ review.book_id }}</small>
+                                </div>
+                            </div>
+                            <div>
+                                {% if review.rating == 5 %}
+                                    <span class="text-warning"><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i></span>
+                                {% elif review.rating == 4 %}
+                                    <span class="text-warning"><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star"></i></span>
+                                {% elif review.rating == 3 %}
+                                    <span class="text-warning"><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star"></i><i class="bi bi-star"></i></span>
+                                {% elif review.rating == 2 %}
+                                    <span class="text-warning"><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star"></i><i class="bi bi-star"></i><i class="bi bi-star"></i></span>
+                                {% else %}
+                                    <span class="text-warning"><i class="bi bi-star-fill"></i><i class="bi bi-star"></i><i class="bi bi-star"></i><i class="bi bi-star"></i><i class="bi bi-star"></i></span>
+                                {% endif %}
+                                <span class="badge bg-warning text-dark ms-1">{{ review.rating }}/5</span>
+                            </div>
+                        </div>
+                        <p class="mt-3 mb-0">{{ review.comment }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="card">
+            <div class="empty-state">
+                <i class="bi bi-chat-dots d-block"></i>
+                <h5>Chưa có đánh giá nào</h5>
+                <p class="text-muted">Hãy là người đầu tiên đánh giá cuốn sách này</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header bg-warning">
+                <h6 class="mb-0"><i class="bi bi-star me-1"></i>Viết đánh giá</h6>
+            </div>
+            <div class="card-body">
+                <form method="post" action="/reviews-ui/{{ book_id }}/">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">ID Khách hàng</label>
+                        <input type="number" name="customer_id" class="form-control" required placeholder="Nhập ID khách hàng" min="1">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Đánh giá (1-5 sao)</label>
+                        <select name="rating" class="form-select" required>
+                            <option value="5">⭐⭐⭐⭐⭐ - Xuất sắc</option>
+                            <option value="4">⭐⭐⭐⭐ - Tốt</option>
+                            <option value="3">⭐⭐⭐ - Trung bình</option>
+                            <option value="2">⭐⭐ - Kém</option>
+                            <option value="1">⭐ - Rất kém</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Bình luận</label>
+                        <textarea name="comment" class="form-control" rows="4" required placeholder="Viết bình luận của bạn..."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-warning w-100">
+                        <i class="bi bi-send me-1"></i>Gửi đánh giá
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header bg-info text-white">
+                <h6 class="mb-0"><i class="bi bi-arrow-right-circle me-1"></i>Xem đánh giá sách khác</h6>
+            </div>
+            <div class="card-body">
+                <form id="switchReviewForm">
+                    <div class="input-group">
+                        <input type="number" class="form-control" id="switchReviewBookId" placeholder="ID sách" min="1">
+                        <button class="btn btn-info text-white" type="button" data-navigate-btn data-navigate-input="switchReviewBookId" data-navigate-url="/reviews-ui/{id}/">
+                            <i class="bi bi-arrow-right"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
