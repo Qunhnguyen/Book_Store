@@ -17,3 +17,5 @@ Thumbs.db
 .idea/
 node_modules/
 dist/
+package-lock.json
+
