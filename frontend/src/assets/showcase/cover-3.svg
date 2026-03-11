@@ -1,0 +1,17 @@
+<svg width="420" height="620" viewBox="0 0 420 620" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="420" height="620" rx="28" fill="#14532D"/>
+  <rect x="30" y="30" width="360" height="560" rx="22" fill="url(#paint0_linear_3_1)"/>
+  <ellipse cx="286" cy="196" rx="96" ry="118" fill="#FCD34D" fill-opacity="0.12"/>
+  <path d="M76 458C134 372 192 308 268 254" stroke="#BBF7D0" stroke-width="14" stroke-linecap="round"/>
+  <path d="M132 478C190 392 248 328 324 274" stroke="#86EFAC" stroke-width="14" stroke-linecap="round"/>
+  <rect x="70" y="86" width="110" height="12" rx="6" fill="#DCFCE7" fill-opacity="0.85"/>
+  <rect x="70" y="112" width="162" height="12" rx="6" fill="#DCFCE7" fill-opacity="0.7"/>
+  <rect x="70" y="510" width="148" height="12" rx="6" fill="#DCFCE7" fill-opacity="0.85"/>
+  <rect x="70" y="536" width="214" height="12" rx="6" fill="#DCFCE7" fill-opacity="0.62"/>
+  <defs>
+    <linearGradient id="paint0_linear_3_1" x1="210" y1="30" x2="210" y2="590" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#166534"/>
+      <stop offset="1" stop-color="#052E16"/>
+    </linearGradient>
+  </defs>
+</svg>
