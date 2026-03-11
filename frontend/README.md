@@ -26,20 +26,12 @@ npm run preview
 
 ## 4) Bien moi truong
 
-Copy `.env.example` thanh `.env` neu ban muon doi base URL service.
+Copy `.env.example` thanh `.env` neu ban muon doi URL backend.
 
-Cac bien ho tro:
-- `VITE_CUSTOMER_API`
-- `VITE_BOOK_API`
-- `VITE_CART_API`
-- `VITE_STAFF_API`
-- `VITE_ORDER_API`
-- `VITE_PAY_API`
-- `VITE_SHIP_API`
-- `VITE_REVIEW_API`
-- `VITE_MANAGER_API`
-- `VITE_CATALOG_API`
-- `VITE_RECOMMENDER_API`
+Bien ho tro:
+- `VITE_API_BASE_URL` (mac dinh: `http://localhost:8000`)
+
+Frontend se goi qua API Gateway theo pattern `VITE_API_BASE_URL/api/...`.
 
 ## 5) Man hinh hien co
 

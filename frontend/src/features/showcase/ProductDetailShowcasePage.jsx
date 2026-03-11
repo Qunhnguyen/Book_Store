@@ -135,7 +135,6 @@ export default function ProductDetailShowcasePage() {
   const [notice, setNotice] = useState('');
 
   const customerId = Number(localStorage.getItem('sb_customer_id') || '1');
-  const cartId = Number(localStorage.getItem('sb_cart_id') || '1');
 
   useEffect(() => {
     async function loadData() {
@@ -210,8 +209,24 @@ export default function ProductDetailShowcasePage() {
           quantity: Number(current.quantity) + 1,
         });
       } else {
+        let resolvedCartId = Number(localStorage.getItem('sb_cart_id') || '0');
+
+        if (!resolvedCartId && list.length && list[0].cart) {
+          resolvedCartId = Number(list[0].cart);
+        }
+
+        if (!resolvedCartId) {
+          const created = await post(`${urls.cart}/carts/`, { customer_id: customerId });
+          resolvedCartId = Number(created?.id || 0);
+        }
+
+        if (!resolvedCartId) {
+          throw new Error('Cannot resolve cart for this customer.');
+        }
+
+        localStorage.setItem('sb_cart_id', String(resolvedCartId));
         await post(`${urls.cart}/cart-items/`, {
-          cart: cartId,
+          cart: resolvedCartId,
           book_id: Number(id),
           quantity: 1,
         });

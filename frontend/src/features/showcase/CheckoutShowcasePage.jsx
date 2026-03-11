@@ -59,26 +59,34 @@ export default function CheckoutShowcasePage() {
       setError('');
       setNotice('');
       setLoading(true);
+      let nextNotice = 'Order confirmed successfully.';
 
       const order = await post(`${urls.order}/orders/`, { customer_id: customerId });
 
       if (order?.id) {
-        await Promise.allSettled([
-          post(`${urls.pay}/payments/`, {
-            order_id: Number(order.id),
-            payment_method: form.paymentMethod,
-          }),
-          post(`${urls.ship}/shipments/`, {
-            order_id: Number(order.id),
-            shipping_method: 'STANDARD',
-            address: form.address,
-          }),
+        const [paymentResult, shipmentResult] = await Promise.allSettled([
+          get(`${urls.pay}/payments/${Number(order.id)}/`),
+          get(`${urls.ship}/shipments/${Number(order.id)}/`),
         ]);
+
+        const hasPayment =
+          paymentResult.status === 'fulfilled' &&
+          Array.isArray(paymentResult.value) &&
+          paymentResult.value.length > 0;
+
+        const hasShipment =
+          shipmentResult.status === 'fulfilled' &&
+          Array.isArray(shipmentResult.value) &&
+          shipmentResult.value.length > 0;
+
+        if (!hasPayment || !hasShipment) {
+          nextNotice = 'Order created. Payment or shipment record may still be processing on backend.';
+        }
       }
 
       const updatedOrders = await get(`${urls.order}/orders/${customerId}/`);
       setOrders(Array.isArray(updatedOrders) ? updatedOrders : []);
-      setNotice('Order confirmed successfully.');
+      setNotice(nextNotice);
     } catch (submitError) {
       setError(getErrorMessage(submitError));
     } finally {
