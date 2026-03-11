@@ -49,6 +49,7 @@ const demoBooks = [
 ];
 
 const demoRecommendations = demoBooks.slice(0, 8);
+const INITIAL_VISIBLE_BOOKS = 10;
 
 function getCoverImage(index) {
   return showcaseImages[index % showcaseImages.length];
@@ -60,6 +61,7 @@ export default function HomeShowcasePage() {
   const [categories, setCategories] = useState([]);
   const [activeCategory, setActiveCategory] = useState('All Categories');
   const [searchText, setSearchText] = useState('');
+  const [visibleBookCount, setVisibleBookCount] = useState(INITIAL_VISIBLE_BOOKS);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -106,6 +108,16 @@ export default function HomeShowcasePage() {
     });
   }, [activeCategory, books, categoryTabs, recommendations, searchText]);
 
+  useEffect(() => {
+    setVisibleBookCount(INITIAL_VISIBLE_BOOKS);
+  }, [activeCategory, searchText]);
+
+  const displayedBooks = useMemo(
+    () => filteredBooks.slice(0, visibleBookCount),
+    [filteredBooks, visibleBookCount],
+  );
+  const hasMoreBooks = displayedBooks.length < filteredBooks.length;
+
   const sourceBooks = recommendations.length ? recommendations : books;
   const heroBooks = sourceBooks.slice(0, 3);
   const featuredHeroBooks = heroBooks.length
@@ -139,7 +151,7 @@ export default function HomeShowcasePage() {
                 <circle cx="9" cy="20" r="1.6" />
                 <circle cx="18" cy="20" r="1.6" />
               </svg>
-              <span>{filteredBooks.slice(0, 10).length}</span>
+              <span>{displayedBooks.length}</span>
             </Link>
             <Link className="sb-icon-link" to="/reviews-profile" aria-label="Open account">
               <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -200,7 +212,7 @@ export default function HomeShowcasePage() {
           </div>
 
           <div className="sb-book-grid">
-            {filteredBooks.slice(0, 10).map((book, idx) => {
+            {displayedBooks.map((book, idx) => {
               const tag = mapTag(book);
               return (
                 <article key={book.id || `${book.title}-${idx}`} className="sb-card">
@@ -222,7 +234,15 @@ export default function HomeShowcasePage() {
           </div>
 
           <div className="sb-center">
-            <Link className="sb-outline-btn" to="/book/1">Load More Titles</Link>
+            {hasMoreBooks ? (
+              <button
+                type="button"
+                className="sb-outline-btn"
+                onClick={() => setVisibleBookCount(filteredBooks.length)}
+              >
+                Load More Titles
+              </button>
+            ) : null}
           </div>
         </section>
       </main>

@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { del, get, getErrorMessage, post, put, urls } from '../../api/client';
 
 function toVnd(value) {
   return `${Math.round(Number(value || 0) * 1000).toLocaleString('vi-VN')}d`;
@@ -43,12 +44,36 @@ const initialCustomers = [
   { id: 6, initials: 'FM', name: 'Fiona Miller', email: 'fiona.miller@store.com', registeredAt: 'Mar 01, 2024', totalOrders: 8, status: 'Active', tone: 'ok' },
 ];
 
+const initialBookForm = {
+  title: '',
+  author: '',
+  price: '',
+  stock: '',
+};
+
+function bookCode(id) {
+  const safe = Number(id);
+  return `B${String(Number.isFinite(safe) ? Math.max(0, Math.trunc(safe)) : 0).padStart(3, '0')}`;
+}
+
+function formatBookPrice(value) {
+  return `${(Number(value) || 0).toLocaleString('vi-VN')}d`;
+}
+
 export default function AdminShowcasePage() {
   const [activeMenu, setActiveMenu] = useState('overview');
   const [query, setQuery] = useState('');
   const [customers, setCustomers] = useState(initialCustomers);
   const [customerPage, setCustomerPage] = useState(1);
   const [customerFilter, setCustomerFilter] = useState('all');
+  const [books, setBooks] = useState([]);
+  const [bookQuery, setBookQuery] = useState('');
+  const [bookPage, setBookPage] = useState(1);
+  const [bookLowStockOnly, setBookLowStockOnly] = useState(false);
+  const [bookModalOpen, setBookModalOpen] = useState(false);
+  const [editingBookId, setEditingBookId] = useState(null);
+  const [bookForm, setBookForm] = useState(initialBookForm);
+  const [bookError, setBookError] = useState('');
 
   const filteredOrders = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -77,11 +102,154 @@ export default function AdminShowcasePage() {
 
   const totalCustomerPages = Math.max(1, Math.ceil(filteredCustomers.length / 5));
 
+  const filteredBooks = useMemo(() => {
+    const term = bookQuery.trim().toLowerCase();
+
+    return books.filter((book) => {
+      const stockPass = !bookLowStockOnly || Number(book.stock) <= 20;
+      if (!stockPass) {
+        return false;
+      }
+
+      if (!term) {
+        return true;
+      }
+
+      const text = `${bookCode(book.id)} ${book.title || ''} ${book.author || ''}`.toLowerCase();
+      return text.includes(term);
+    });
+  }, [bookLowStockOnly, bookQuery, books]);
+
+  const totalBookPages = Math.max(1, Math.ceil(filteredBooks.length / 4));
+  const currentBookPage = Math.min(bookPage, totalBookPages);
+
+  const pagedBooks = useMemo(() => {
+    const start = (currentBookPage - 1) * 4;
+    return filteredBooks.slice(start, start + 4);
+  }, [currentBookPage, filteredBooks]);
+
+  const bookInventoryValue = useMemo(
+    () => books.reduce((sum, book) => sum + (Number(book.price) || 0) * (Number(book.stock) || 0), 0),
+    [books],
+  );
+
+  const lowStockCount = useMemo(
+    () => books.filter((book) => Number(book.stock) <= 20).length,
+    [books],
+  );
+
+  useEffect(() => {
+    async function loadBooks() {
+      try {
+        setBookError('');
+        const data = await get(`${urls.book}/books/`);
+        setBooks(Array.isArray(data) ? data : []);
+      } catch (error) {
+        setBookError(getErrorMessage(error));
+      }
+    }
+
+    loadBooks();
+  }, []);
+
+  useEffect(() => {
+    setBookPage(1);
+  }, [bookLowStockOnly, bookQuery]);
+
+  useEffect(() => {
+    if (bookPage > totalBookPages) {
+      setBookPage(totalBookPages);
+    }
+  }, [bookPage, totalBookPages]);
+
   function openMenu(menuId) {
     setActiveMenu(menuId);
     setQuery('');
     setCustomerFilter('all');
     setCustomerPage(1);
+  }
+
+  function openCreateBookModal() {
+    setEditingBookId(null);
+    setBookForm(initialBookForm);
+    setBookModalOpen(true);
+  }
+
+  function openEditBookModal(book) {
+    setEditingBookId(book.id);
+    setBookForm({
+      title: book.title || '',
+      author: book.author || '',
+      price: String(book.price ?? ''),
+      stock: String(book.stock ?? ''),
+    });
+    setBookModalOpen(true);
+  }
+
+  function closeBookModal() {
+    setBookModalOpen(false);
+    setEditingBookId(null);
+    setBookForm(initialBookForm);
+  }
+
+  async function saveBook(event) {
+    event.preventDefault();
+
+    try {
+      const price = Number(bookForm.price);
+      const stock = Number(bookForm.stock);
+
+      if (!bookForm.title.trim() || !bookForm.author.trim()) {
+        setBookError('Vui long nhap day du tieu de va tac gia.');
+        return;
+      }
+
+      if (!Number.isFinite(price) || price <= 0) {
+        setBookError('Gia ban khong hop le.');
+        return;
+      }
+
+      if (!Number.isFinite(stock) || stock < 0) {
+        setBookError('Ton kho khong hop le.');
+        return;
+      }
+
+      setBookError('');
+
+      const payload = {
+        title: bookForm.title.trim(),
+        author: bookForm.author.trim(),
+        price,
+        stock: Math.trunc(stock),
+      };
+
+      if (editingBookId) {
+        await put(`${urls.book}/books/${editingBookId}/`, payload);
+        setBooks((current) => current.map((book) => (book.id === editingBookId ? { ...book, ...payload } : book)));
+      } else {
+        const created = await post(`${urls.book}/books/`, payload);
+        if (created && typeof created === 'object') {
+          setBooks((current) => [created, ...current]);
+        } else {
+          const latest = await get(`${urls.book}/books/`);
+          setBooks(Array.isArray(latest) ? latest : []);
+        }
+      }
+
+      closeBookModal();
+    } catch (error) {
+      setBookError(getErrorMessage(error));
+    }
+  }
+
+  async function removeBook(bookId) {
+    try {
+      setBookError('');
+      await del(`${urls.book}/books/${bookId}/`);
+      setBooks((current) => current.filter((book) => book.id !== bookId));
+    } catch (error) {
+      setBookError(getErrorMessage(error));
+    }
   }
 
   function toggleCustomerFilter() {
@@ -314,6 +482,183 @@ export default function AdminShowcasePage() {
     );
   }
 
+  function renderBooks() {
+    const start = filteredBooks.length ? (currentBookPage - 1) * 4 + 1 : 0;
+    const end = Math.min(currentBookPage * 4, filteredBooks.length);
+
+    return (
+      <>
+        <header className="sb-admin-lite-topbar sb-admin-lite-topbar-customers">
+          <div>
+            <h1>Danh sach Sach</h1>
+            <p className="sb-admin-lite-subtitle">Quan ly kho va danh muc san pham cua ban</p>
+          </div>
+          <div className="sb-admin-lite-topbar-actions">
+            <button type="button" className="sb-admin-lite-primary" onClick={openCreateBookModal}>
+              + Them Sach Moi
+            </button>
+          </div>
+        </header>
+
+        {bookError ? <div className="sb-admin-lite-alert">{bookError}</div> : null}
+
+        <section className="sb-admin-lite-panel sb-admin-lite-customers-panel">
+          <div className="sb-admin-lite-panel-head sb-admin-lite-panel-head-stack">
+            <div className="sb-admin-lite-customers-toolbar">
+              <label className="sb-admin-lite-search wide">
+                <span>⌕</span>
+                <input
+                  placeholder="Tim kiem theo tieu de, tac gia hoac ma sach..."
+                  value={bookQuery}
+                  onChange={(event) => setBookQuery(event.target.value)}
+                />
+              </label>
+              <div className="sb-admin-lite-inline-actions">
+                <button
+                  type="button"
+                  className="sb-admin-lite-soft-btn"
+                  onClick={() => setBookLowStockOnly((state) => !state)}
+                >
+                  {bookLowStockOnly ? 'Bo loc ton thap' : 'Loc ton thap'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="sb-admin-lite-table-wrap">
+            <table className="sb-admin-lite-table sb-admin-lite-books-table">
+              <thead>
+                <tr>
+                  <th>MA SACH</th>
+                  <th>TIEU DE</th>
+                  <th>TAC GIA</th>
+                  <th>GIA BAN</th>
+                  <th>TON KHO</th>
+                  <th>THAO TAC</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pagedBooks.map((book) => (
+                  <tr key={book.id}>
+                    <td className="sb-admin-lite-order-id">{bookCode(book.id)}</td>
+                    <td>{book.title}</td>
+                    <td>{book.author}</td>
+                    <td><strong>{formatBookPrice(book.price)}</strong></td>
+                    <td>
+                      <span className={`sb-admin-lite-status ${Number(book.stock) <= 20 ? 'warn' : 'ok'}`}>
+                        {Number(book.stock) || 0}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="sb-admin-lite-inline-actions">
+                        <button type="button" className="sb-admin-lite-view" onClick={() => openEditBookModal(book)}>Sua</button>
+                        <button type="button" className="sb-admin-lite-danger" onClick={() => removeBook(book.id)}>Xoa</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="sb-admin-lite-table-footer">
+            <small>Dang xem {start} den {end} trong so {filteredBooks.length} dau sach</small>
+            <div className="sb-admin-lite-pagination">
+              <button type="button" onClick={() => setBookPage((page) => Math.max(1, page - 1))}>‹</button>
+              {Array.from({ length: Math.min(5, totalBookPages) }, (_, index) => index + 1).map((page) => (
+                <button
+                  key={page}
+                  type="button"
+                  className={page === currentBookPage ? 'active' : ''}
+                  onClick={() => setBookPage(page)}
+                >
+                  {page}
+                </button>
+              ))}
+              <button type="button" onClick={() => setBookPage((page) => Math.min(totalBookPages, page + 1))}>›</button>
+            </div>
+          </div>
+        </section>
+
+        <section className="sb-admin-lite-kpis sb-admin-lite-books-kpis">
+          <article className="sb-admin-lite-kpi">
+            <div className="sb-admin-lite-kpi-head">
+              <span className="sb-admin-lite-kpi-icon">▣</span>
+            </div>
+            <p>Tong so dau sach</p>
+            <strong>{books.length.toLocaleString('vi-VN')}</strong>
+          </article>
+          <article className="sb-admin-lite-kpi">
+            <div className="sb-admin-lite-kpi-head">
+              <span className="sb-admin-lite-kpi-icon">⚠</span>
+            </div>
+            <p>Sach sap het hang</p>
+            <strong>{lowStockCount.toLocaleString('vi-VN')}</strong>
+          </article>
+          <article className="sb-admin-lite-kpi">
+            <div className="sb-admin-lite-kpi-head">
+              <span className="sb-admin-lite-kpi-icon">◍</span>
+            </div>
+            <p>Gia tri ton kho</p>
+            <strong>{formatBookPrice(bookInventoryValue)}</strong>
+          </article>
+        </section>
+
+        {bookModalOpen ? (
+          <div className="sb-admin-lite-modal-backdrop" role="presentation" onClick={closeBookModal}>
+            <section className="sb-admin-lite-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+              <h2>{editingBookId ? `Chinh sua ${bookCode(editingBookId)}` : 'Them Sach Moi'}</h2>
+              <form className="sb-admin-lite-book-form" onSubmit={saveBook}>
+                <label>
+                  Tieu de
+                  <input
+                    required
+                    value={bookForm.title}
+                    onChange={(event) => setBookForm((current) => ({ ...current, title: event.target.value }))}
+                  />
+                </label>
+                <label>
+                  Tac gia
+                  <input
+                    required
+                    value={bookForm.author}
+                    onChange={(event) => setBookForm((current) => ({ ...current, author: event.target.value }))}
+                  />
+                </label>
+                <label>
+                  Gia ban
+                  <input
+                    required
+                    type="number"
+                    min="1"
+                    step="0.01"
+                    value={bookForm.price}
+                    onChange={(event) => setBookForm((current) => ({ ...current, price: event.target.value }))}
+                  />
+                </label>
+                <label>
+                  Ton kho
+                  <input
+                    required
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={bookForm.stock}
+                    onChange={(event) => setBookForm((current) => ({ ...current, stock: event.target.value }))}
+                  />
+                </label>
+                <div className="sb-admin-lite-modal-actions">
+                  <button type="button" className="sb-admin-lite-soft-btn" onClick={closeBookModal}>Huy</button>
+                  <button type="submit" className="sb-admin-lite-primary">{editingBookId ? 'Cap nhat' : 'Them sach'}</button>
+                </div>
+              </form>
+            </section>
+          </div>
+        ) : null}
+      </>
+    );
+  }
+
   return (
     <div className="sb-page sb-admin-lite">
       <div className="sb-admin-lite-layout">
@@ -352,7 +697,9 @@ export default function AdminShowcasePage() {
         </aside>
 
         <main className="sb-admin-lite-main">
-          {activeMenu === 'customers' ? renderCustomers() : renderOverview()}
+          {activeMenu === 'books' ? renderBooks() : null}
+          {activeMenu === 'customers' ? renderCustomers() : null}
+          {activeMenu !== 'books' && activeMenu !== 'customers' ? renderOverview() : null}
         </main>
       </div>
     </div>
