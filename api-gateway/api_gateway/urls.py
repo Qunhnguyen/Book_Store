@@ -5,6 +5,7 @@ from app.views import (
     book_detail_api, books_api, books_ui, cart_by_customer_api,
     cart_item_detail_api, cart_items_api, cart_ui, carts_api,
     categories_api, categories_ui, customer_orders_api, customers_api,
+    customer_login_api, customer_register_api,
     customers_ui, home_ui, managers_api, managers_ui, orders_api,
     orders_ui, payments_api, payments_by_order_api, payments_ui,
     recommendations_api, recommendations_ui, reviews_api,
@@ -15,6 +16,8 @@ from app.views import (
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("api/login/", customer_login_api),
+    path("api/register/", customer_register_api),
     path("api/books/", books_api),
     path("api/books/<int:book_id>/", book_detail_api),
     path("api/customers/", customers_api),

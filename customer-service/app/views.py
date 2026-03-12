@@ -1,4 +1,5 @@
 import requests
+from django.contrib.auth.hashers import check_password
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -7,6 +8,31 @@ from .models import Customer
 from .serializers import CustomerSerializer
 
 CART_SERVICE_URL = "http://cart-service:8000"
+
+
+class CustomerLogin(APIView):
+    def post(self, request):
+        email = request.data.get("email")
+        password = request.data.get("password")
+
+        if not email or not password:
+            return Response({"error": "Email and password are required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            customer = Customer.objects.get(email=email)
+        except Customer.DoesNotExist:
+            return Response({"error": "Invalid email or password"}, status=status.HTTP_401_UNAUTHORIZED)
+
+        if not check_password(password, customer.password):
+            return Response({"error": "Invalid email or password"}, status=status.HTTP_401_UNAUTHORIZED)
+
+        # Trả về customer_id cho FE để lưu
+        return Response({
+            "message": "Login successful",
+            "customer_id": customer.id,
+            "name": customer.name,
+            "email": customer.email
+        }, status=status.HTTP_200_OK)
 
 
 class CustomerListCreate(APIView):

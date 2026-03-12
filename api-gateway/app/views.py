@@ -64,6 +64,16 @@ def customers_api(request):
 
 
 @csrf_exempt
+def customer_register_api(request):
+    return _forward_request(request, CUSTOMER_SERVICE_URL, '/customers/')
+
+
+@csrf_exempt
+def customer_login_api(request):
+    return _forward_request(request, CUSTOMER_SERVICE_URL, '/login/')
+
+
+@csrf_exempt
 def carts_api(request):
     return _forward_request(request, CART_SERVICE_URL, '/carts/')
 

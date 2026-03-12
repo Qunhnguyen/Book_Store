@@ -55,20 +55,47 @@ Body tao/cap nhat sach:
 }
 ```
 
-### 5.2 Customers
-- `GET /api/customers/` - Lay danh sach khach hang
-- `POST /api/customers/` - Tao khach hang
+### 5.2 Customers (Auth)
+- `POST /api/register/` - Đăng ký tài khoản mới
+- `POST /api/login/` - Đăng nhập tài khoản
+- `GET /api/customers/` - Lấy danh sách khách hàng
 
-Body tao customer:
+Body đăng ký (`POST /api/register/`):
 
 ```json
 {
+  "name": "Nguyen Van A",
+  "email": "a@example.com",
+  "password": "mysecretpassword"
+}
+```
+
+Kết quả trả về HTTP `201 Created` kèm thông tin user vừa tạo (không bao gồm password).
+Lưu ý: Service customer sẽ gọi sang cart-service để tạo cart mặc định. Nếu cart-service lỗi, customer có thể bị rollback và trả về lỗi `503`.
+
+Body đăng nhập (`POST /api/login/`):
+
+```json
+{
+  "email": "a@example.com",
+  "password": "mysecretpassword"
+}
+```
+
+Kết quả trả về nếu đúng tài khoản hợp lệ (HTTP `200 OK`):
+
+```json
+{
+  "message": "Login successful",
+  "customer_id": 1,
   "name": "Nguyen Van A",
   "email": "a@example.com"
 }
 ```
 
-Luu y: Service customer se goi sang cart-service de tao cart mac dinh. Neu cart-service loi, customer co the bi rollback va tra ve loi 503.
+**Quan trọng cho Frontend:**
+- Frontend cần lưu giá trị `customer_id` từ kết quả đăng nhập (ví dụ lưu trong `localStorage` hoặc `Redux`/`Context`).
+- Các hành động tiếp theo của người dùng (như lấy giỏ hàng, tạo đơn hàng, v.v.) sẽ sử dụng `customer_id` này để gửi kèm trong request body hoặc URL.
 
 ### 5.3 Cart
 - `POST /api/carts/` - Tao cart thu cong
@@ -206,12 +233,13 @@ Tra ve toi da 5 sach con hang.
 
 ## 6) Luong tich hop de FE implement
 Nen di theo flow:
-1. Tao hoac lay danh sach books
-2. Tao customer
-3. Tao cart (neu can) va them cart-items
-4. Tao order bang customer_id
-5. Hien thi payments + shipments theo order_id
-6. Tao/xem reviews theo book_id
+1. Đăng ký/Đăng nhập (nhấn nút Get Started để Đăng ký và Đăng nhập để nhận `customer_id`).
+2. Luôn lưu lại `customer_id` ở FE để tái sử dụng.
+3. Tao hoac lay danh sach books
+4. Tao cart (neu can) va them cart-items bằng `customer_id`
+5. Tao order bang `customer_id`
+6. Hien thi payments + shipments theo order_id
+7. Tao/xem reviews theo book_id
 
 ## 7) Vi du service file cho FE (axios)
 
@@ -237,9 +265,13 @@ export const BooksApi = {
   remove: (id: number) => api.delete(`/api/books/${id}/`),
 };
 
+export const AuthApi = {
+  register: (payload: { name: string; email: string; password: string }) => api.post("/api/register/", payload),
+  login: (payload: { email: string; password: string }) => api.post("/api/login/", payload),
+};
+
 export const CustomersApi = {
   list: () => api.get("/api/customers/"),
-  create: (payload: { name: string; email: string }) => api.post("/api/customers/", payload),
 };
 
 export const CartApi = {
