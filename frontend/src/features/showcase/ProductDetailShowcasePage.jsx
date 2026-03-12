@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { get, getErrorMessage, post, put, urls } from '../../api/client';
 import cover1 from '../../assets/showcase/cover-1.svg';
