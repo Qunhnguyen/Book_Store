@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, NavLink } from 'react-router-dom';
+import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { get, urls } from '../../api/client';
+import { useAuth } from '../../app/context/AuthContext';
 import cover1 from '../../assets/showcase/cover-1.svg';
 import cover2 from '../../assets/showcase/cover-2.svg';
 import cover3 from '../../assets/showcase/cover-3.svg';
@@ -64,6 +65,25 @@ export default function HomeShowcasePage() {
   const [visibleBookCount, setVisibleBookCount] = useState(INITIAL_VISIBLE_BOOKS);
   const [error, setError] = useState('');
 
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
+
+  const handleCartClick = (e, path) => {
+    if (!user) {
+      e.preventDefault();
+      navigate('/login', { state: { from: location } });
+    } else if (path) {
+      e.preventDefault();
+      navigate(path);
+    }
+  };
+
   useEffect(() => {
     async function loadData() {
       try {
@@ -123,10 +143,10 @@ export default function HomeShowcasePage() {
   const featuredHeroBooks = heroBooks.length
     ? heroBooks
     : [
-        { id: 101, title: 'The Art of Minimal', author: 'Elena Rivers' },
-        { id: 102, title: 'Future Visions', author: 'Marcus Thorne' },
-        { id: 103, title: 'History Reimagined', author: 'Sarah J. Miller' },
-      ];
+      { id: 101, title: 'The Art of Minimal', author: 'Elena Rivers' },
+      { id: 102, title: 'Future Visions', author: 'Marcus Thorne' },
+      { id: 103, title: 'History Reimagined', author: 'Sarah J. Miller' },
+    ];
 
   return (
     <div className="sb-page sb-home">
@@ -145,7 +165,7 @@ export default function HomeShowcasePage() {
             <a href="#popular-books">Deals</a>
           </nav>
           <div className="sb-actions">
-            <Link className="sb-icon-link" to="/cart" aria-label="Open cart">
+            <Link className="sb-icon-link" to="/cart" aria-label="Open cart" onClick={(e) => handleCartClick(e)}>
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M3 5H5L7.4 15.2C7.5 15.7 8 16 8.5 16H18.2C18.7 16 19.1 15.7 19.2 15.2L21 8H6.2" />
                 <circle cx="9" cy="20" r="1.6" />
@@ -153,12 +173,30 @@ export default function HomeShowcasePage() {
               </svg>
               <span>{displayedBooks.length}</span>
             </Link>
-            <Link className="sb-icon-link" to="/reviews-profile" aria-label="Open account">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <circle cx="12" cy="8" r="3.5" />
-                <path d="M5 19C6.7 15.9 9 14.5 12 14.5C15 14.5 17.3 15.9 19 19" />
-              </svg>
-            </Link>
+
+            {user ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <Link className="sb-icon-link" to="/reviews-profile" aria-label="Open account" title={user.name}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="12" cy="8" r="3.5" />
+                    <path d="M5 19C6.7 15.9 9 14.5 12 14.5C15 14.5 17.3 15.9 19 19" />
+                  </svg>
+                  <span style={{ marginLeft: '4px', fontSize: '14px', whiteSpace: 'nowrap' }}>Hi, {user.name}</span>
+                </Link>
+                <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#ff4d4f', cursor: 'pointer', padding: '0 8px' }}>
+                  Logout
+                </button>
+              </div>
+            ) : (
+              <Link className="sb-icon-link" to="/login" aria-label="Login">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M10 17l5-5-5-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M15 12H3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span style={{ marginLeft: '4px', fontSize: '14px' }}>Login</span>
+              </Link>
+            )}
           </div>
         </div>
       </header>
@@ -224,9 +262,13 @@ export default function HomeShowcasePage() {
                   <p>{book.author}</p>
                   <div className="sb-price-row">
                     <strong>{asCurrency(book.price)}</strong>
-                    <Link to="/cart" className="sb-mini-btn" aria-label={`Go to cart from ${book.title}`}>
+                    <button
+                      className="sb-mini-btn"
+                      aria-label={`Go to cart from ${book.title}`}
+                      onClick={(e) => handleCartClick(e, `/book/${book.id}`)}
+                    >
                       +
-                    </Link>
+                    </button>
                   </div>
                 </article>
               );

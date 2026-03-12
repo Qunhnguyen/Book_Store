@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { get, getErrorMessage, post, put, urls } from '../../api/client';
 import cover1 from '../../assets/showcase/cover-1.svg';
 import cover2 from '../../assets/showcase/cover-2.svg';
@@ -10,6 +10,7 @@ import cover6 from '../../assets/showcase/cover-6.svg';
 import midnightCover from '../../assets/showcase/midnight-library.svg';
 import avatarSarah from '../../assets/showcase/avatar-sarah.svg';
 import avatarMichael from '../../assets/showcase/avatar-michael.svg';
+import { useAuth } from '../../app/context/AuthContext';
 
 const demoBooks = [
   {
@@ -129,12 +130,14 @@ const ratingBreakdown = [
 export default function ProductDetailShowcasePage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [books, setBooks] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
-  const customerId = Number(localStorage.getItem('sb_customer_id') || '1');
+  const { user } = useAuth();
+  const customerId = user ? user.id : null;
 
   useEffect(() => {
     async function loadData() {
@@ -182,25 +185,32 @@ export default function ProductDetailShowcasePage() {
 
   const detailBook = book
     ? {
-        ...book,
-        cover: book.cover || coverMap[Number(book.id)] || cover1,
-        description:
-          book.description ||
-          'A visually rich title presented with sample data so you can review the product detail UI before the backend is fully connected.',
-        publisher: book.publisher || 'Lumina Press',
-        releaseDate: book.releaseDate || 'Mar 14, 2024',
-        pages: book.pages || 288,
-        language: book.language || 'English',
-        category: book.category || 'Design',
-        reviewsCount: book.reviewsCount || 245,
-      }
+      ...book,
+      cover: book.cover || coverMap[Number(book.id)] || cover1,
+      description:
+        book.description ||
+        'A visually rich title presented with sample data so you can review the product detail UI before the backend is fully connected.',
+      publisher: book.publisher || 'Lumina Press',
+      releaseDate: book.releaseDate || 'Mar 14, 2024',
+      pages: book.pages || 288,
+      language: book.language || 'English',
+      category: book.category || 'Design',
+      reviewsCount: book.reviewsCount || 245,
+    }
     : null;
 
   async function addToCart() {
     try {
+      if (!user) {
+        navigate('/login', { state: { from: location } });
+        return;
+      }
+
       setError('');
       setNotice('');
-      const items = await get(`${urls.cart}/carts/${customerId}/`);
+
+      const realCustomerId = Number(customerId);
+      const items = await get(`${urls.cart}/carts/${realCustomerId}/`);
       const list = Array.isArray(items) ? items : [];
       const current = list.find((item) => Number(item.book_id) === Number(id));
 
@@ -216,7 +226,7 @@ export default function ProductDetailShowcasePage() {
         }
 
         if (!resolvedCartId) {
-          const created = await post(`${urls.cart}/carts/`, { customer_id: customerId });
+          const created = await post(`${urls.cart}/carts/`, { customer_id: realCustomerId });
           resolvedCartId = Number(created?.id || 0);
         }
 

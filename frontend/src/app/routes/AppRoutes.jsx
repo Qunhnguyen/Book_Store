@@ -1,5 +1,8 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import PublicLayout from '../layouts/PublicLayout';
+import ProtectedRoute from './ProtectedRoute';
+import LoginPage from '../../features/auth/LoginPage';
+import RegisterPage from '../../features/auth/RegisterPage';
 import HomeShowcasePage from '../../features/showcase/HomeShowcasePage';
 import ProductDetailShowcasePage from '../../features/showcase/ProductDetailShowcasePage';
 import CartShowcasePage from '../../features/showcase/CartShowcasePage';
@@ -25,10 +28,12 @@ export default function AppRoutes() {
       <Route element={<PublicLayout />}>
         <Route path="/" element={<HomeShowcasePage />} />
         <Route path="/book/:id" element={<ProductDetailShowcasePage />} />
-        <Route path="/cart" element={<CartShowcasePage />} />
-        <Route path="/checkout" element={<CheckoutShowcasePage />} />
-        <Route path="/reviews-profile" element={<ReviewsProfileShowcasePage />} />
+        <Route path="/cart" element={<ProtectedRoute><CartShowcasePage /></ProtectedRoute>} />
+        <Route path="/checkout" element={<ProtectedRoute><CheckoutShowcasePage /></ProtectedRoute>} />
+        <Route path="/reviews-profile" element={<ProtectedRoute><ReviewsProfileShowcasePage /></ProtectedRoute>} />
         <Route path="/admin" element={<AdminShowcasePage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
       </Route>
 
       <Route path="/ops" element={<DashboardPage />} />
