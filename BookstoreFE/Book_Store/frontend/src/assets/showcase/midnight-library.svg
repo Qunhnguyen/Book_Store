@@ -1,0 +1,53 @@
+<svg width="900" height="1200" viewBox="0 0 900 1200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="900" height="1200" rx="40" fill="#0E2235"/>
+  <rect x="24" y="24" width="852" height="1152" rx="28" fill="url(#paint0_linear_midnight)"/>
+  <rect x="36" y="36" width="828" height="20" fill="#C68C59" fill-opacity="0.9"/>
+  <rect x="48" y="92" width="804" height="1012" rx="12" fill="#10273A"/>
+  <g opacity="0.9">
+    <rect x="72" y="124" width="756" height="180" rx="8" fill="#163149"/>
+    <rect x="72" y="314" width="756" height="180" rx="8" fill="#143149"/>
+    <rect x="72" y="504" width="756" height="180" rx="8" fill="#143149"/>
+    <rect x="72" y="694" width="756" height="180" rx="8" fill="#143149"/>
+    <rect x="72" y="884" width="756" height="180" rx="8" fill="#143149"/>
+  </g>
+  <g opacity="0.85">
+    <rect x="104" y="134" width="20" height="160" rx="4" fill="#274A66"/>
+    <rect x="132" y="154" width="30" height="140" rx="4" fill="#355A78"/>
+    <rect x="170" y="144" width="22" height="150" rx="4" fill="#203E57"/>
+    <rect x="200" y="162" width="18" height="132" rx="4" fill="#4B6883"/>
+    <rect x="226" y="138" width="26" height="156" rx="4" fill="#264760"/>
+    <rect x="260" y="154" width="18" height="140" rx="4" fill="#355A78"/>
+    <rect x="286" y="144" width="24" height="150" rx="4" fill="#223E57"/>
+    <rect x="318" y="164" width="18" height="130" rx="4" fill="#315572"/>
+  </g>
+  <g opacity="0.85">
+    <rect x="566" y="134" width="20" height="160" rx="4" fill="#274A66"/>
+    <rect x="594" y="154" width="30" height="140" rx="4" fill="#355A78"/>
+    <rect x="632" y="144" width="22" height="150" rx="4" fill="#203E57"/>
+    <rect x="662" y="162" width="18" height="132" rx="4" fill="#4B6883"/>
+    <rect x="688" y="138" width="26" height="156" rx="4" fill="#264760"/>
+    <rect x="722" y="154" width="18" height="140" rx="4" fill="#355A78"/>
+    <rect x="748" y="144" width="24" height="150" rx="4" fill="#223E57"/>
+    <rect x="780" y="164" width="18" height="130" rx="4" fill="#315572"/>
+  </g>
+  <rect x="316" y="292" width="268" height="498" rx="134" fill="#15344D" stroke="#375E78" stroke-width="10"/>
+  <path d="M450 346C416 346 388 374 388 408V598H512V408C512 374 484 346 450 346Z" fill="url(#paint1_linear_midnight)"/>
+  <path d="M430 596C430 548 440 518 450 488C460 518 470 548 470 596" stroke="#A4EBFF" stroke-width="8" stroke-linecap="round"/>
+  <path d="M450 346V320" stroke="#9CDFFF" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="450" cy="430" r="12" fill="#B8F2FF"/>
+  <path d="M116 940C116 892 146 866 174 860V1048H116V940Z" fill="#274B67"/>
+  <path d="M770 940C770 892 740 866 712 860V1048H770V940Z" fill="#274B67"/>
+  <path d="M124 1048H776" stroke="#1D3B54" stroke-width="14" stroke-linecap="round"/>
+  <text x="120" y="1012" fill="#E6E7DC" font-family="Georgia, serif" font-size="56">The Midnight Library</text>
+  <text x="310" y="1054" fill="#C89B6B" font-family="Arial, sans-serif" font-size="18" letter-spacing="6">A NOVEL BY MATT HAIG</text>
+  <defs>
+    <linearGradient id="paint0_linear_midnight" x1="450" y1="24" x2="450" y2="1176" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#133049"/>
+      <stop offset="1" stop-color="#0A1B2A"/>
+    </linearGradient>
+    <linearGradient id="paint1_linear_midnight" x1="450" y1="346" x2="450" y2="598" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1A4767"/>
+      <stop offset="1" stop-color="#8EE7FF"/>
+    </linearGradient>
+  </defs>
+</svg>
