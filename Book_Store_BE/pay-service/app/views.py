@@ -1,4 +1,5 @@
 import requests
+from django.http import HttpResponse, JsonResponse
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -53,3 +54,25 @@ class PaymentByOrder(APIView):
         payments = Payment.objects.filter(order_id=order_id).order_by("id")
         serializer = PaymentSerializer(payments, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+def health_check(request):
+    """GET /health/ — liveness probe."""
+    return JsonResponse({'status': 'ok', 'service': 'pay-service'})
+
+
+def metrics_view(request):
+    """GET /metrics/ — Prometheus text format."""
+    total = Payment.objects.count()
+    paid = Payment.objects.filter(status='PAID').count()
+    refunded = Payment.objects.filter(status='REFUNDED').count()
+    failed = Payment.objects.filter(status='FAILED').count()
+    lines = [
+        '# HELP payment_total Total number of payments',
+        '# TYPE payment_total gauge',
+        f'payment_total {total}',
+        f'payment_status_count{{status="PAID"}} {paid}',
+        f'payment_status_count{{status="REFUNDED"}} {refunded}',
+        f'payment_status_count{{status="FAILED"}} {failed}',
+    ]
+    return HttpResponse('\n'.join(lines) + '\n', content_type='text/plain; version=0.0.4')

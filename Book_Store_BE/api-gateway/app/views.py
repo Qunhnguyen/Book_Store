@@ -1,7 +1,13 @@
+import logging
+import time
 import requests
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.csrf import csrf_exempt
+
+from .circuit_breaker import CircuitBreakerOpen, get_breaker
+
+logger = logging.getLogger(__name__)
 
 REQUEST_TIMEOUT_SECONDS = 5
 
@@ -17,8 +23,23 @@ CATALOG_SERVICE_URL = 'http://catalog-service:8000'
 STAFF_SERVICE_URL = 'http://staff-service:8000'
 RECOMMENDER_AI_SERVICE_URL = 'http://recommender-ai-service:8000'
 
+# Simple in-process counters for /metrics
+_request_count = 0
+_error_count = 0
+
+
+def _extract_service_name(service_url: str) -> str:
+    """Extract a short service name from the URL for circuit breaker keying."""
+    # e.g. 'http://book-service:8000' → 'book-service'
+    return service_url.split('//')[1].split(':')[0]
+
 
 def _forward_request(request, service_url, upstream_path):
+    global _request_count, _error_count
+
+    service_name = _extract_service_name(service_url)
+    breaker = get_breaker(service_name)
+
     headers = {}
     content_type = request.headers.get('Content-Type')
     accept = request.headers.get('Accept')
@@ -34,17 +55,40 @@ def _forward_request(request, service_url, upstream_path):
     if 'HTTP_X_USER_EMAIL' in request.META:
         headers['X-User-Email'] = request.META['HTTP_X_USER_EMAIL']
 
+    _request_count += 1
+    start_time = time.time()
+
     try:
-        response = requests.request(
-            method=request.method,
-            url=f'{service_url}{upstream_path}',
-            params=request.GET,
-            data=request.body or None,
-            headers=headers,
-            timeout=REQUEST_TIMEOUT_SECONDS,
+        with breaker:
+            response = requests.request(
+                method=request.method,
+                url=f'{service_url}{upstream_path}',
+                params=request.GET,
+                data=request.body or None,
+                headers=headers,
+                timeout=REQUEST_TIMEOUT_SECONDS,
+            )
+    except CircuitBreakerOpen:
+        _error_count += 1
+        logger.warning(
+            "circuit_open service=%s method=%s path=%s duration_ms=0",
+            service_name, request.method, upstream_path,
         )
-    except requests.RequestException:
+        return JsonResponse({'error': f'Service {service_name} is temporarily unavailable (circuit open)'}, status=503)
+    except requests.RequestException as exc:
+        _error_count += 1
+        duration_ms = int((time.time() - start_time) * 1000)
+        logger.error(
+            "upstream_error service=%s method=%s path=%s duration_ms=%d error=%s",
+            service_name, request.method, upstream_path, duration_ms, exc,
+        )
         return JsonResponse({'error': 'Cannot reach upstream service'}, status=503)
+
+    duration_ms = int((time.time() - start_time) * 1000)
+    logger.info(
+        "proxy service=%s method=%s path=%s status=%d duration_ms=%d",
+        service_name, request.method, upstream_path, response.status_code, duration_ms,
+    )
 
     response_content_type = response.headers.get('Content-Type', 'application/json')
     return HttpResponse(
@@ -52,6 +96,28 @@ def _forward_request(request, service_url, upstream_path):
         status=response.status_code,
         content_type=response_content_type,
     )
+
+
+# ---------------------------------------------------------------------------
+# Observability endpoints
+# ---------------------------------------------------------------------------
+
+def health_check(request):
+    """GET /api/health/ — liveness probe, no JWT required."""
+    return JsonResponse({'status': 'ok', 'service': 'api-gateway'})
+
+
+def metrics_view(request):
+    """GET /api/metrics/ — Prometheus text format, no JWT required."""
+    lines = [
+        '# HELP gateway_requests_total Total HTTP requests proxied by api-gateway',
+        '# TYPE gateway_requests_total counter',
+        f'gateway_requests_total {_request_count}',
+        '# HELP gateway_errors_total Total upstream errors seen by api-gateway',
+        '# TYPE gateway_errors_total counter',
+        f'gateway_errors_total {_error_count}',
+    ]
+    return HttpResponse('\n'.join(lines) + '\n', content_type='text/plain; version=0.0.4')
 
 
 @csrf_exempt

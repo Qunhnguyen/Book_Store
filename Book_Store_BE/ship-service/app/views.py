@@ -1,4 +1,5 @@
 import requests
+from django.http import HttpResponse, JsonResponse
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -48,3 +49,25 @@ class ShipmentByOrder(APIView):
         shipments = Shipment.objects.filter(order_id=order_id).order_by("id")
         serializer = ShipmentSerializer(shipments, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+def health_check(request):
+    """GET /health/ — liveness probe."""
+    return JsonResponse({'status': 'ok', 'service': 'ship-service'})
+
+
+def metrics_view(request):
+    """GET /metrics/ — Prometheus text format."""
+    total = Shipment.objects.count()
+    reserved = Shipment.objects.filter(status='RESERVED').count()
+    cancelled = Shipment.objects.filter(status='CANCELLED').count()
+    failed = Shipment.objects.filter(status='FAILED').count()
+    lines = [
+        '# HELP shipment_total Total number of shipments',
+        '# TYPE shipment_total gauge',
+        f'shipment_total {total}',
+        f'shipment_status_count{{status="RESERVED"}} {reserved}',
+        f'shipment_status_count{{status="CANCELLED"}} {cancelled}',
+        f'shipment_status_count{{status="FAILED"}} {failed}',
+    ]
+    return HttpResponse('\n'.join(lines) + '\n', content_type='text/plain; version=0.0.4')

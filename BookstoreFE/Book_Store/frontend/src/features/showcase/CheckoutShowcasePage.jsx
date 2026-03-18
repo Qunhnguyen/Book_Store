@@ -67,27 +67,13 @@ export default function CheckoutShowcasePage() {
 
       const order = await OrdersApi.create(customerId);
 
-      if (order?.id) {
-        // Create payment and shipment using the form data
-        const [paymentResult, shipmentResult] = await Promise.allSettled([
-          PaymentsApi.create({
-            order_id: Number(order.id),
-            payment_method: form.paymentMethod,
-          }),
-          ShipmentsApi.create({
-            order_id: Number(order.id),
-            shipping_method: 'STANDARD',
-            address: form.address,
-          }),
-        ]);
-
-        const hasPayment = paymentResult.status === 'fulfilled';
-        const hasShipment = shipmentResult.status === 'fulfilled';
-
-        if (!hasPayment || !hasShipment) {
-          nextNotice = 'Order created, but there was an issue recording payment or shipment details.';
-        }
+      if (!order?.id) {
+        throw new Error("Failed to create order.");
       }
+      
+      // In Phase 4/5/6, Payment and Shipment are created automatically 
+      // by the Backend via RabbitMQ Saga Orchestrator. 
+      // We do not need to call PaymentsApi.create and ShipmentsApi.create manually.
 
       const updatedOrders = await OrdersApi.listByCustomer(customerId);
       setOrders(Array.isArray(updatedOrders) ? updatedOrders : []);

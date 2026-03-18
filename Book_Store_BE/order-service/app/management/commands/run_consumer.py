@@ -1,66 +1,83 @@
 import json
+import logging
 import os
+import time
+
+import django
 import pika
+
 from django.core.management.base import BaseCommand
-from app.saga_orchestrator import handle_payment_result, handle_shipping_result, handle_payment_compensate_result
+
+logger = logging.getLogger(__name__)
+
+RABBITMQ_URL = os.environ.get("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
+EXCHANGE_NAME = "bookstore.topic"
+QUEUE_NAME = "order_service_queue"
+BINDING_KEYS = ["payment.reserve.completed", "shipping.reserve.completed", "payment.compensate.completed"]
+
+
+def _process_message(ch, method, properties, body):
+    from app.saga_orchestrator import (
+        handle_payment_compensate_result,
+        handle_payment_result,
+        handle_shipping_result,
+    )
+    try:
+        data = json.loads(body)
+        event_type = data.get("event_type")
+        saga_id = data.get("saga_id", "")
+        correlation_id = data.get("correlation_id", "")
+        payload = data.get("payload", {})
+        success = payload.get("success", False)
+        message = payload.get("message", "")
+
+        logger.info(
+            "消费者收到事件 event_type=%s saga_id=%s correlation_id=%s success=%s",
+            event_type, saga_id, correlation_id, success,
+        )
+
+        if event_type == "payment.reserve.completed":
+            handle_payment_result(saga_id, success, message, payload)
+        elif event_type == "shipping.reserve.completed":
+            handle_shipping_result(saga_id, success, message, payload)
+        elif event_type == "payment.compensate.completed":
+            handle_payment_compensate_result(saga_id, success, message, payload)
+        else:
+            logger.warning("consumer_unknown_event event_type=%s", event_type)
+
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+    except Exception as exc:
+        logger.exception("consumer_processing_error saga_id=%s error=%s", data.get("saga_id", ""), exc)
+        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+
 
 class Command(BaseCommand):
-    help = 'Starts the RabbitMQ consumer for order-service Saga'
+    help = "Consume RabbitMQ events for order-service (Saga orchestrator)"
 
     def handle(self, *args, **options):
-        rabbitmq_url = os.environ.get("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
-        exchange_name = "bookstore.topic"
-        queue_name = "order_service_queue"
-
-        import time
-        parameters = pika.URLParameters(rabbitmq_url)
-        connection = None
-        for i in range(10):
+        while True:
             try:
+                parameters = pika.URLParameters(RABBITMQ_URL)
                 connection = pika.BlockingConnection(parameters)
-                break
-            except Exception as e:
-                self.stdout.write(f"RabbitMQ not ready yet ({e}). Retrying in 5 seconds...")
+                channel = connection.channel()
+
+                channel.exchange_declare(exchange=EXCHANGE_NAME, exchange_type="topic", durable=True)
+                channel.queue_declare(queue=QUEUE_NAME, durable=True)
+                for key in BINDING_KEYS:
+                    channel.queue_bind(exchange=EXCHANGE_NAME, queue=QUEUE_NAME, routing_key=key)
+
+                channel.basic_qos(prefetch_count=1)
+                channel.basic_consume(queue=QUEUE_NAME, on_message_callback=_process_message)
+
+                logger.info("order-consumer started, waiting for events on queue=%s", QUEUE_NAME)
+                channel.start_consuming()
+            except pika.exceptions.AMQPConnectionError as exc:
+                logger.warning("order-consumer connection lost: %s — reconnecting in 5s", exc)
                 time.sleep(5)
-                
-        if not connection:
-            raise Exception("Failed to connect to RabbitMQ after retries.")
-            
-        channel = connection.channel()
+            except KeyboardInterrupt:
+                logger.info("order-consumer stopped")
+                break
+            except Exception as exc:
+                logger.exception("order-consumer unexpected error: %s — reconnecting in 5s", exc)
+                time.sleep(5)
 
-        channel.exchange_declare(exchange=exchange_name, exchange_type='topic', durable=True)
-        channel.queue_declare(queue=queue_name, durable=True)
-        # Bind the events that order-service cares about
-        channel.queue_bind(exchange=exchange_name, queue=queue_name, routing_key="payment.reserve.completed")
-        channel.queue_bind(exchange=exchange_name, queue=queue_name, routing_key="payment.reserve.failed")
-        channel.queue_bind(exchange=exchange_name, queue=queue_name, routing_key="shipping.reserve.completed")
-        channel.queue_bind(exchange=exchange_name, queue=queue_name, routing_key="shipping.reserve.failed")
-        channel.queue_bind(exchange=exchange_name, queue=queue_name, routing_key="payment.compensate.completed")
-        
-        def callback(ch, method, properties, body):
-            event = json.loads(body)
-            event_type = event.get('event_type')
-            saga_id = event.get('saga_id')
-            payload = event.get('payload', {})
-            success = payload.get('success', True)
-            message = payload.get('message', '')
-
-            self.stdout.write(f"Received {event_type} for saga {saga_id}")
-
-            if event_type == "payment.reserve.completed":
-                handle_payment_result(saga_id, success, message, payload)
-            elif event_type == "payment.reserve.failed":
-                handle_payment_result(saga_id, False, message, payload)
-            elif event_type == "shipping.reserve.completed":
-                handle_shipping_result(saga_id, success, message, payload)
-            elif event_type == "shipping.reserve.failed":
-                handle_shipping_result(saga_id, False, message, payload)
-            elif event_type == "payment.compensate.completed":
-                handle_payment_compensate_result(saga_id, success, message, payload)
-            
-            ch.basic_ack(delivery_tag=method.delivery_tag)
-
-        channel.basic_consume(queue=queue_name, on_message_callback=callback)
-
-        self.stdout.write(' [*] Waiting for messages. To exit press CTRL+C')
-        channel.start_consuming()

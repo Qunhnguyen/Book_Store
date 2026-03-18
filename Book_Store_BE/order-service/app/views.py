@@ -1,5 +1,7 @@
+import logging
 import requests
 import uuid
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.response import Response
@@ -8,6 +10,8 @@ from rest_framework.views import APIView
 from .events import publish_event
 from .models import Order, OrderItem
 from .serializers import OrderSerializer
+
+logger = logging.getLogger(__name__)
 
 CART_SERVICE_URL = "http://cart-service:8000"
 PAY_SERVICE_URL = "http://pay-service:8000"
@@ -148,3 +152,25 @@ class OrderUpdateStatus(APIView):
             order.save(update_fields=["status"])
             return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
         return Response({"error": "status is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+
+def health_check(request):
+    """GET /health/ — liveness probe."""
+    return JsonResponse({'status': 'ok', 'service': 'order-service'})
+
+
+def metrics_view(request):
+    """GET /metrics/ — Prometheus text format."""
+    total = Order.objects.count()
+    confirmed = Order.objects.filter(status='CONFIRMED').count()
+    cancelled = Order.objects.filter(status='CANCELLED').count()
+    pending = Order.objects.filter(status='PENDING').count()
+    lines = [
+        '# HELP order_total Total number of orders',
+        '# TYPE order_total gauge',
+        f'order_total {total}',
+        f'order_status_count{{status="CONFIRMED"}} {confirmed}',
+        f'order_status_count{{status="CANCELLED"}} {cancelled}',
+        f'order_status_count{{status="PENDING"}} {pending}',
+    ]
+    return HttpResponse('\n'.join(lines) + '\n', content_type='text/plain; version=0.0.4')

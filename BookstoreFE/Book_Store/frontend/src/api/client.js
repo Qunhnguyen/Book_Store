@@ -11,6 +11,22 @@ export const api = axios.create({
   timeout: 10000,
 });
 
+// Request interceptor to attach JWT token
+api.interceptors.request.use((config) => {
+  const storedUser = localStorage.getItem('user');
+  if (storedUser) {
+    try {
+      const user = JSON.parse(storedUser);
+      if (user && user.token) {
+        config.headers.Authorization = `Bearer ${user.token}`;
+      }
+    } catch (e) {
+      console.error('Failed to parse user for token', e);
+    }
+  }
+  return config;
+});
+
 // Response interceptor to unwrap data, keeping the same behavior as the old get/post functions
 api.interceptors.response.use(
   (response) => response.data,

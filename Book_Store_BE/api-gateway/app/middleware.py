@@ -11,6 +11,8 @@ PUBLIC_PATHS = [
     '/api/categories/',
     '/api/reviews/book/',
     '/api/recommendations/',
+    '/api/health/',
+    '/api/metrics/',
 ]
 
 class JWTAuthenticationMiddleware(MiddlewareMixin):

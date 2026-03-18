@@ -1,8 +1,11 @@
 import json
+import logging
 import os
 import time
 import uuid
 import pika
+
+logger = logging.getLogger(__name__)
 
 RABBITMQ_URL = os.environ.get("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
 EXCHANGE_NAME = "bookstore.topic"
@@ -26,28 +29,42 @@ def publish_event(event_type, payload, correlation_id=None, saga_id=None):
         "payload": payload
     }
 
-    try:
-        parameters = pika.URLParameters(RABBITMQ_URL)
-        connection = pika.BlockingConnection(parameters)
-        channel = connection.channel()
+    max_attempts = 3
+    for attempt in range(1, max_attempts + 1):
+        try:
+            parameters = pika.URLParameters(RABBITMQ_URL)
+            connection = pika.BlockingConnection(parameters)
+            channel = connection.channel()
 
-        # Ensure the exchange exists
-        channel.exchange_declare(exchange=EXCHANGE_NAME, exchange_type='topic', durable=True)
+            # Ensure the exchange exists
+            channel.exchange_declare(exchange=EXCHANGE_NAME, exchange_type='topic', durable=True)
 
-        routing_key = event_type
-        message_body = json.dumps(event_msg)
+            routing_key = event_type
+            message_body = json.dumps(event_msg)
 
-        channel.basic_publish(
-            exchange=EXCHANGE_NAME,
-            routing_key=routing_key,
-            body=message_body,
-            properties=pika.BasicProperties(
-                delivery_mode=2,  # make message persistent
+            channel.basic_publish(
+                exchange=EXCHANGE_NAME,
+                routing_key=routing_key,
+                body=message_body,
+                properties=pika.BasicProperties(
+                    delivery_mode=2,  # make message persistent
+                )
             )
-        )
-        print(f" [x] Sent {routing_key}: {message_body}")
-        connection.close()
-        return True, event_msg
-    except Exception as e:
-        print(f" [x] Error sending event: {e}")
-        return False, None
+            logger.info(
+                "event_published event_type=%s saga_id=%s correlation_id=%s",
+                event_type, saga_id, correlation_id,
+            )
+            connection.close()
+            return True, event_msg
+        except Exception as exc:
+            logger.warning(
+                "event_publish_failed attempt=%d/%d event_type=%s saga_id=%s error=%s",
+                attempt, max_attempts, event_type, saga_id, exc,
+            )
+            if attempt < max_attempts:
+                time.sleep(attempt)  # backoff: 1s, 2s
+    logger.error(
+        "event_publish_abandoned event_type=%s saga_id=%s after %d attempts",
+        event_type, saga_id, max_attempts,
+    )
+    return False, None

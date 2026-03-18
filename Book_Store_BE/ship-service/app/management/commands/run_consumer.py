@@ -1,106 +1,125 @@
 import json
+import logging
 import os
+import time
+
 import pika
 from django.core.management.base import BaseCommand
-from app.models import Shipment, ProcessedEvent
-from app.events import publish_event
 from django.db import transaction
 
+from app.models import ProcessedEvent, Shipment
+
+logger = logging.getLogger(__name__)
+
+RABBITMQ_URL = os.environ.get("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
+EXCHANGE_NAME = "bookstore.topic"
+QUEUE_NAME = "ship_service_queue"
+BINDING_KEYS = ["shipping.reserve.requested", "shipping.compensate.requested"]
+
+
+def _process_message(ch, method, properties, body):
+    try:
+        data = json.loads(body)
+        event_type = data.get("event_type")
+        event_id = data.get("event_id", "")
+        saga_id = data.get("saga_id", "")
+        correlation_id = data.get("correlation_id", "")
+        payload = data.get("payload", {})
+        order_id = payload.get("order_id")
+        customer_id = payload.get("customer_id")
+        force_shipping_failure = payload.get("force_shipping_failure", False)
+
+        logger.info(
+            "consumer_received event_type=%s saga_id=%s correlation_id=%s event_id=%s",
+            event_type, saga_id, correlation_id, event_id,
+        )
+
+        # Idempotency check
+        if ProcessedEvent.objects.filter(event_id=event_id).exists():
+            logger.info("consumer_duplicate_event event_id=%s — skipping", event_id)
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+            return
+
+        with transaction.atomic():
+            if event_type == "shipping.reserve.requested":
+                _handle_shipping_reserve(order_id, customer_id, saga_id, correlation_id, force_shipping_failure)
+            elif event_type == "shipping.compensate.requested":
+                _handle_shipping_compensate(order_id, saga_id, correlation_id)
+            else:
+                logger.warning("consumer_unknown_event event_type=%s", event_type)
+
+            ProcessedEvent.objects.create(event_id=event_id)
+
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+
+    except Exception as exc:
+        logger.exception("consumer_processing_error event_id=%s error=%s", data.get("event_id", ""), exc)
+        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+
+
+def _handle_shipping_reserve(order_id, customer_id, saga_id, correlation_id, force_shipping_failure):
+    from app.events import publish_event
+    if force_shipping_failure:
+        shipment = Shipment.objects.create(
+            order_id=order_id, shipping_method="STANDARD",
+            address=f"Customer {customer_id} address", status="FAILED"
+        )
+        logger.warning("shipping_reserve_failed order_id=%s saga_id=%s (forced)", order_id, saga_id)
+        publish_event(
+            "shipping.reserve.completed",
+            {"order_id": order_id, "success": False, "shipment_id": shipment.id},
+            correlation_id=correlation_id, saga_id=saga_id
+        )
+    else:
+        shipment = Shipment.objects.create(
+            order_id=order_id, shipping_method="STANDARD",
+            address=f"Customer {customer_id} address", status="RESERVED"
+        )
+        logger.info("shipping_reserve_completed order_id=%s saga_id=%s shipment_id=%s", order_id, saga_id, shipment.id)
+        publish_event(
+            "shipping.reserve.completed",
+            {"order_id": order_id, "success": True, "shipment_id": shipment.id},
+            correlation_id=correlation_id, saga_id=saga_id
+        )
+
+
+def _handle_shipping_compensate(order_id, saga_id, correlation_id):
+    from app.events import publish_event
+    updated = Shipment.objects.filter(order_id=order_id).update(status="CANCELLED")
+    logger.info("shipping_compensated order_id=%s saga_id=%s updated=%d", order_id, saga_id, updated)
+    publish_event(
+        "shipping.compensate.completed",
+        {"order_id": order_id, "success": True},
+        correlation_id=correlation_id, saga_id=saga_id
+    )
+
+
 class Command(BaseCommand):
-    help = 'Starts the RabbitMQ consumer for ship-service'
+    help = "Consume RabbitMQ events for ship-service"
 
     def handle(self, *args, **options):
-        rabbitmq_url = os.environ.get("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
-        exchange_name = "bookstore.topic"
-        queue_name = "ship_service_queue"
-
-        import time
-        parameters = pika.URLParameters(rabbitmq_url)
-        connection = None
-        for i in range(10):
+        while True:
             try:
+                parameters = pika.URLParameters(RABBITMQ_URL)
                 connection = pika.BlockingConnection(parameters)
-                break
-            except Exception as e:
-                self.stdout.write(f"RabbitMQ not ready yet ({e}). Retrying in 5 seconds...")
+                channel = connection.channel()
+
+                channel.exchange_declare(exchange=EXCHANGE_NAME, exchange_type="topic", durable=True)
+                channel.queue_declare(queue=QUEUE_NAME, durable=True)
+                for key in BINDING_KEYS:
+                    channel.queue_bind(exchange=EXCHANGE_NAME, queue=QUEUE_NAME, routing_key=key)
+
+                channel.basic_qos(prefetch_count=1)
+                channel.basic_consume(queue=QUEUE_NAME, on_message_callback=_process_message)
+
+                logger.info("ship-consumer started, waiting for events on queue=%s", QUEUE_NAME)
+                channel.start_consuming()
+            except pika.exceptions.AMQPConnectionError as exc:
+                logger.warning("ship-consumer connection lost: %s — reconnecting in 5s", exc)
                 time.sleep(5)
-        
-        if not connection:
-            raise Exception("Failed to connect to RabbitMQ after retries.")
-            
-        channel = connection.channel()
-
-        channel.exchange_declare(exchange=exchange_name, exchange_type='topic', durable=True)
-        channel.queue_declare(queue=queue_name, durable=True)
-        channel.queue_bind(exchange=exchange_name, queue=queue_name, routing_key="shipping.reserve.requested")
-        channel.queue_bind(exchange=exchange_name, queue=queue_name, routing_key="shipping.compensate.requested")
-
-        def callback(ch, method, properties, body):
-            event = json.loads(body)
-            event_id = event.get('event_id')
-            event_type = event.get('event_type')
-            saga_id = event.get('saga_id')
-            correlation_id = event.get('correlation_id')
-            payload = event.get('payload', {})
-
-            self.stdout.write(f"Received {event_type} (event_id: {event_id}, saga_id: {saga_id})")
-
-            # Idempotency check
-            if ProcessedEvent.objects.filter(event_id=event_id).exists():
-                self.stdout.write(f"Event {event_id} already processed. Skipping.")
-                ch.basic_ack(delivery_tag=method.delivery_tag)
-                return
-
-            try:
-                with transaction.atomic():
-                    if event_type == "shipping.reserve.requested":
-                        order_id = payload.get("order_id")
-                        force_shipping_failure = payload.get("force_shipping_failure", False)
-                        
-                        if force_shipping_failure:
-                            shipping = Shipment.objects.create(
-                                order_id=order_id,
-                                status="FAILED"
-                            )
-                            publish_event("shipping.reserve.completed", {
-                                "order_id": order_id,
-                                "success": False,
-                                "message": "Shipping failed (forced for testing)"
-                            }, correlation_id=correlation_id, saga_id=saga_id)
-                        else:
-                            shipping = Shipment.objects.create(
-                                order_id=order_id,
-                                status="RESERVED"
-                            )
-                            publish_event("shipping.reserve.completed", {
-                                "order_id": order_id,
-                                "success": True,
-                                "message": "Shipping reserved"
-                            }, correlation_id=correlation_id, saga_id=saga_id)
-                    
-                    elif event_type == "shipping.compensate.requested":
-                        order_id = payload.get("order_id")
-                        shippings = Shipment.objects.filter(order_id=order_id)
-                        for s in shippings:
-                            s.status = "CANCELLED"
-                            s.save()
-                            
-                        publish_event("shipping.compensate.completed", {
-                            "order_id": order_id,
-                            "success": True,
-                            "message": "Shipping compensation applied"
-                        }, correlation_id=correlation_id, saga_id=saga_id)
-                    
-                    # Mark event as processed inside transaction
-                    ProcessedEvent.objects.create(event_id=event_id)
-                    
-                ch.basic_ack(delivery_tag=method.delivery_tag)
-            except Exception as e:
-                self.stdout.write(f"Error processing event {event_id}: {e}")
-                # Requeue on failure, or could publish failure event if business error
-                ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
-
-        channel.basic_consume(queue=queue_name, on_message_callback=callback)
-
-        self.stdout.write(' [*] Waiting for messages.')
-        channel.start_consuming()
+            except KeyboardInterrupt:
+                logger.info("ship-consumer stopped")
+                break
+            except Exception as exc:
+                logger.exception("ship-consumer unexpected error: %s — reconnecting in 5s", exc)
+                time.sleep(5)

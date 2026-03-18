@@ -6,7 +6,8 @@ from app.views import (
     cart_item_detail_api, cart_items_api, cart_ui, carts_api,
     categories_api, categories_ui, customer_orders_api, customers_api,
     customer_login_api, customer_register_api,
-    customers_ui, home_ui, managers_api, managers_ui, orders_api,
+    customers_ui, health_check, home_ui, managers_api, managers_ui,
+    metrics_view, orders_api,
     orders_ui, payments_api, payments_by_order_api, payments_ui,
     recommendations_api, recommendations_ui, reviews_api,
     reviews_by_book_api, reviews_ui, shipments_api,
@@ -16,10 +17,18 @@ from app.views import (
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    # Observability (no JWT)
+    path("api/health/", health_check),
+    path("api/metrics/", metrics_view),
+    # Auth
     path("api/login/", customer_login_api),
     path("api/register/", customer_register_api),
+    # Public
     path("api/books/", books_api),
     path("api/books/<int:book_id>/", book_detail_api),
+    path("api/categories/", categories_api),
+    path("api/recommendations/", recommendations_api),
+    # Protected
     path("api/customers/", customers_api),
     path("api/carts/", carts_api),
     path("api/carts/<int:customer_id>/", cart_by_customer_api),
@@ -34,10 +43,9 @@ urlpatterns = [
     path("api/reviews/", reviews_api),
     path("api/reviews/book/<int:book_id>/", reviews_by_book_api),
     path("api/managers/", managers_api),
-    path("api/categories/", categories_api),
     path("api/staff/books/", staff_books_api),
     path("api/staff/books/<int:book_id>/", staff_book_detail_api),
-    path("api/recommendations/", recommendations_api),
+    # UI
     path("", home_ui),
     path("books-ui/", books_ui),
     path("cart-ui/<int:customer_id>/", cart_ui),
