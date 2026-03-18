@@ -2773,6 +2773,64 @@ td {
   font-weight: 700;
 }
 
+.sb-review-replies {
+  margin-top: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.sb-review-reply-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.sb-review-reply-item {
+  border: 1px solid var(--sb-line);
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px 12px;
+}
+
+.sb-review-reply-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sb-review-reply-head strong {
+  font-size: 14px;
+  color: #283452;
+}
+
+.sb-review-reply-head small {
+  color: #98a3bc;
+}
+
+.sb-review-reply-item p {
+  margin: 8px 0 0;
+  color: #43506d;
+  line-height: 1.55;
+}
+
+.sb-review-reply-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+}
+
+.sb-review-reply-form input {
+  border: 1px solid #d6dced;
+  border-radius: 12px;
+  background: #f8faff;
+  padding: 10px 12px;
+  font: inherit;
+  color: #1d2744;
+}
+
 .sb-filter-btn-icon::before {
   content: '▾';
   margin-right: 6px;

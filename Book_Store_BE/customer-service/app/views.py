@@ -1,4 +1,7 @@
+import os
 import requests
+import jwt
+from datetime import datetime, timedelta
 from django.contrib.auth.hashers import check_password
 from rest_framework import status
 from rest_framework.response import Response
@@ -26,9 +29,19 @@ class CustomerLogin(APIView):
         if not check_password(password, customer.password):
             return Response({"error": "Invalid email or password"}, status=status.HTTP_401_UNAUTHORIZED)
 
+        # Generate JWT Token
+        jwt_secret = os.environ.get("JWT_SECRET", "fallback-secret-key")
+        payload = {
+            "customer_id": customer.id,
+            "email": customer.email,
+            "exp": datetime.utcnow() + timedelta(hours=24) # Token expires in 24 hours
+        }
+        token = jwt.encode(payload, jwt_secret, algorithm="HS256")
+
         # Trả về customer_id cho FE để lưu
         return Response({
             "message": "Login successful",
+            "token": token,
             "customer_id": customer.id,
             "name": customer.name,
             "email": customer.email

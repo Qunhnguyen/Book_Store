@@ -5,61 +5,210 @@ services:
     build: ./customer-service
     ports:
       - "8001:8000"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=customer_db
+      - DB_USER=customer_db
+      - DB_PASSWORD=customer_db
+      - JWT_SECRET=super-secret-key-for-bookstore
+    depends_on:
+      - postgres
 
   book-service:
     build: ./book-service
     ports:
       - "8002:8000"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=book_db
+      - DB_USER=book_db
+      - DB_PASSWORD=book_db
+    depends_on:
+      - postgres
 
   cart-service:
     build: ./cart-service
     ports:
       - "8003:8000"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=cart_db
+      - DB_USER=cart_db
+      - DB_PASSWORD=cart_db
+    depends_on:
+      - postgres
 
   staff-service:
     build: ./staff-service
     ports:
       - "8004:8000"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=staff_db
+      - DB_USER=staff_db
+      - DB_PASSWORD=staff_db
+    depends_on:
+      - postgres
 
   order-service:
     build: ./order-service
     ports:
       - "8005:8000"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=order_db
+      - DB_USER=order_db
+      - DB_PASSWORD=order_db
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      - postgres
+      - rabbitmq
+
+  order-consumer:
+    build: ./order-service
+    restart: always
+    command: ["/wait-for-postgres.sh", "postgres", "python", "manage.py", "run_consumer"]
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=order_db
+      - DB_USER=order_db
+      - DB_PASSWORD=order_db
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      - postgres
+      - rabbitmq
 
   pay-service:
     build: ./pay-service
     ports:
       - "8006:8000"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=pay_db
+      - DB_USER=pay_db
+      - DB_PASSWORD=pay_db
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      - postgres
+      - rabbitmq
+
+  pay-consumer:
+    build: ./pay-service
+    restart: always
+    command: ["/wait-for-postgres.sh", "postgres", "python", "manage.py", "run_consumer"]
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=pay_db
+      - DB_USER=pay_db
+      - DB_PASSWORD=pay_db
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      - postgres
+      - rabbitmq
 
   ship-service:
     build: ./ship-service
     ports:
       - "8007:8000"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=ship_db
+      - DB_USER=ship_db
+      - DB_PASSWORD=ship_db
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      - postgres
+      - rabbitmq
+
+  ship-consumer:
+    build: ./ship-service
+    restart: always
+    command: ["/wait-for-postgres.sh", "postgres", "python", "manage.py", "run_consumer"]
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=ship_db
+      - DB_USER=ship_db
+      - DB_PASSWORD=ship_db
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      - postgres
+      - rabbitmq
 
   comment-rate-service:
     build: ./comment-rate-service
     ports:
       - "8008:8000"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=comment_rate_db
+      - DB_USER=comment_rate_db
+      - DB_PASSWORD=comment_rate_db
+    depends_on:
+      - postgres
 
   manager-service:
     build: ./manager-service
     ports:
       - "8009:8000"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=manager_db
+      - DB_USER=manager_db
+      - DB_PASSWORD=manager_db
+    depends_on:
+      - postgres
 
   catalog-service:
     build: ./catalog-service
     ports:
       - "8010:8000"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=catalog_db
+      - DB_USER=catalog_db
+      - DB_PASSWORD=catalog_db
+    depends_on:
+      - postgres
 
   recommender-ai-service:
     build: ./recommender-ai-service
     ports:
       - "8011:8000"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=recommender_db
+      - DB_USER=recommender_db
+      - DB_PASSWORD=recommender_db
+    depends_on:
+      - postgres
 
   api-gateway:
     build: ./api-gateway
     ports:
       - "8000:8000"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=gateway_db
+      - DB_USER=gateway_db
+      - DB_PASSWORD=gateway_db
+      - JWT_SECRET=super-secret-key-for-bookstore
+    depends_on:
+      - postgres
 
   redis:
     image: "redis:alpine"
@@ -72,9 +221,45 @@ services:
       - "8012:8000"
     depends_on:
       - redis
+      - postgres
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=image_db
+      - DB_USER=image_db
+      - DB_PASSWORD=image_db
 
   image-worker:
     build: ./image-service
     command: celery -A image_service worker -l info
     depends_on:
       - redis
+      - postgres
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=image_db
+      - DB_USER=image_db
+      - DB_PASSWORD=image_db
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_MULTIPLE_DATABASES=customer_db,book_db,cart_db,staff_db,order_db,pay_db,ship_db,comment_rate_db,manager_db,catalog_db,recommender_db,gateway_db,image_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres-init.sh:/docker-entrypoint-initdb.d/postgres-init.sh:ro
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    restart: always
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+volumes:
+  postgres_data:

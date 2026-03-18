@@ -28,6 +28,12 @@ def _forward_request(request, service_url, upstream_path):
     if accept:
         headers['Accept'] = accept
 
+    # Inject User Information from JWT verification metadata
+    if 'HTTP_X_USER_ID' in request.META:
+        headers['X-User-Id'] = request.META['HTTP_X_USER_ID']
+    if 'HTTP_X_USER_EMAIL' in request.META:
+        headers['X-User-Email'] = request.META['HTTP_X_USER_EMAIL']
+
     try:
         response = requests.request(
             method=request.method,

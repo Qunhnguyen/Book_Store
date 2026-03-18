@@ -75,8 +75,11 @@ export default function ReviewsProfileShowcasePage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const customerId = user ? (user.customer_id || user.id) : 1;
+  const replyStorageKey = `bookstore-review-replies-${customerId || 'guest'}`;
   const [reviews, setReviews] = useState([]);
   const [books, setBooks] = useState([]);
+  const [replyDrafts, setReplyDrafts] = useState({});
+  const [replyThreads, setReplyThreads] = useState({});
   const [activeSection, setActiveSection] = useState('reviews');
   const [filterMode, setFilterMode] = useState('latest');
   const [currentPage, setCurrentPage] = useState(1);
@@ -131,6 +134,29 @@ export default function ReviewsProfileShowcasePage() {
 
     loadData();
   }, [customerId]);
+
+  useEffect(() => {
+    try {
+      const rawData = localStorage.getItem(replyStorageKey);
+      if (!rawData) {
+        setReplyThreads({});
+        return;
+      }
+
+      const parsedData = JSON.parse(rawData);
+      setReplyThreads(parsedData && typeof parsedData === 'object' ? parsedData : {});
+    } catch (_error) {
+      setReplyThreads({});
+    }
+  }, [replyStorageKey]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(replyStorageKey, JSON.stringify(replyThreads));
+    } catch (_error) {
+      return;
+    }
+  }, [replyStorageKey, replyThreads]);
 
   const myReviews = useMemo(
     () => reviews.filter((item) => Number(item.customer_id) === Number(customerId)),
@@ -195,6 +221,64 @@ export default function ReviewsProfileShowcasePage() {
 
   function updateProfileField(field, value) {
     setProfileForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function getLocalReplies(reviewId) {
+    return Array.isArray(replyThreads[reviewId]) ? replyThreads[reviewId] : [];
+  }
+
+  function getReplyCount(review) {
+    const localReplyCount = getLocalReplies(review.id).length;
+
+    if (typeof review.replies === 'number') {
+      return review.replies + localReplyCount;
+    }
+
+    return localReplyCount;
+  }
+
+  function updateReplyDraft(reviewId, content) {
+    setReplyDrafts((current) => ({
+      ...current,
+      [reviewId]: content,
+    }));
+  }
+
+  function submitReply(reviewId) {
+    const content = String(replyDrafts[reviewId] || '').trim();
+    if (!content) {
+      return;
+    }
+
+    const nextReply = {
+      id: `reply-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      author: 'Ban',
+      content,
+      created_at: new Date().toISOString(),
+    };
+
+    setReplyThreads((current) => ({
+      ...current,
+      [reviewId]: [...(Array.isArray(current[reviewId]) ? current[reviewId] : []), nextReply],
+    }));
+
+    setReplyDrafts((current) => ({
+      ...current,
+      [reviewId]: '',
+    }));
+  }
+
+  function formatReplyDate(value) {
+    if (!value) {
+      return 'Vua xong';
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return 'Vua xong';
+    }
+
+    return date.toLocaleString('vi-VN');
   }
 
   function startEditingProfile() {
@@ -369,7 +453,44 @@ export default function ReviewsProfileShowcasePage() {
                   <p>{review.comment || 'No comment from this review.'}</p>
                   <div className="sb-review-meta">
                     <span>👍 {review.likes ?? Math.max(1, review.id % 50)} Thich</span>
-                    <span>💬 {review.replies ?? Math.max(0, review.id % 12)} Phan hoi</span>
+                    <span>💬 {getReplyCount(review)} Phan hoi</span>
+                  </div>
+                  <div className="sb-review-replies">
+                    {getLocalReplies(review.id).length ? (
+                      <ul className="sb-review-reply-list">
+                        {getLocalReplies(review.id).map((item) => (
+                          <li key={item.id} className="sb-review-reply-item">
+                            <div className="sb-review-reply-head">
+                              <strong>{item.author || 'Ban doc'}</strong>
+                              <small>{formatReplyDate(item.created_at)}</small>
+                            </div>
+                            <p>{item.content}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+
+                    <div className="sb-review-reply-form">
+                      <input
+                        placeholder="Tra loi comment nay..."
+                        value={replyDrafts[review.id] || ''}
+                        onChange={(event) => updateReplyDraft(review.id, event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault();
+                            submitReply(review.id);
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="sb-filter-btn"
+                        onClick={() => submitReply(review.id)}
+                        disabled={!String(replyDrafts[review.id] || '').trim()}
+                      >
+                        Tra loi
+                      </button>
+                    </div>
                   </div>
                 </div>
               </article>

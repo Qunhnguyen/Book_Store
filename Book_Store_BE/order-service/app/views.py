@@ -1,9 +1,11 @@
 import requests
+import uuid
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .events import publish_event
 from .models import Order, OrderItem
 from .serializers import OrderSerializer
 
@@ -21,6 +23,8 @@ class OrderListCreate(APIView):
 
     def post(self, request):
         customer_id = request.data.get("customer_id")
+        force_payment_failure = request.data.get("force_payment_failure", False)
+        force_shipping_failure = request.data.get("force_shipping_failure", False)
         if customer_id is None:
             return Response({"error": "customer_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -83,8 +87,17 @@ class OrderListCreate(APIView):
         if not order_items_to_create:
             return Response({"error": "No valid cart items"}, status=status.HTTP_400_BAD_REQUEST)
 
+        saga_id = str(uuid.uuid4())
+        correlation_id = str(uuid.uuid4())
+        
         # Create Order
-        order = Order.objects.create(customer_id=customer_id, status="CREATED", total_price=total_price)
+        order = Order.objects.create(
+            customer_id=customer_id, 
+            status="PENDING", 
+            total_price=total_price,
+            saga_id=saga_id,
+            correlation_id=correlation_id
+        )
 
         # Create OrderItems
         order_items_db = [
@@ -105,23 +118,16 @@ class OrderListCreate(APIView):
         except requests.RequestException:
             pass
 
-        try:
-            requests.post(
-                f"{PAY_SERVICE_URL}/payments/",
-                json={"order_id": order.id, "customer_id": customer_id},
-                timeout=3,
-            )
-        except requests.RequestException:
-            pass
-
-        try:
-            requests.post(
-                f"{SHIP_SERVICE_URL}/shipments/",
-                json={"order_id": order.id, "customer_id": customer_id},
-                timeout=3,
-            )
-        except requests.RequestException:
-            pass
+        # Publish Event
+        payload = {
+            "order_id": order.id,
+            "customer_id": customer_id,
+            "total_price": float(total_price),
+            "items": order_items_to_create,
+            "force_payment_failure": force_payment_failure,
+            "force_shipping_failure": force_shipping_failure
+        }
+        publish_event("payment.reserve.requested", payload, correlation_id=correlation_id, saga_id=saga_id)
 
         return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
 

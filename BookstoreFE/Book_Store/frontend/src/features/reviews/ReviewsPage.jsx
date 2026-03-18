@@ -1,16 +1,41 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ReviewsApi, getErrorMessage } from '../../api/client';
 import AlertBox from '../../shared/components/AlertBox';
-import DataTable from '../../shared/components/DataTable';
 import EmptyState from '../../shared/components/EmptyState';
 import PageHeader from '../../shared/components/PageHeader';
 import SectionCard from '../../shared/components/SectionCard';
 
 export default function ReviewsPage() {
+  const replyStorageKey = 'bookstore-ops-review-replies';
   const [bookId, setBookId] = useState('');
   const [form, setForm] = useState({ customer_id: '', rating: '5', comment: '' });
   const [reviews, setReviews] = useState([]);
+  const [replyDrafts, setReplyDrafts] = useState({});
+  const [replyThreads, setReplyThreads] = useState({});
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    try {
+      const rawData = localStorage.getItem(replyStorageKey);
+      if (!rawData) {
+        setReplyThreads({});
+        return;
+      }
+
+      const parsedData = JSON.parse(rawData);
+      setReplyThreads(parsedData && typeof parsedData === 'object' ? parsedData : {});
+    } catch (_error) {
+      setReplyThreads({});
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(replyStorageKey, JSON.stringify(replyThreads));
+    } catch (_error) {
+      return;
+    }
+  }, [replyThreads]);
 
   async function loadReviews() {
     try {
@@ -37,6 +62,54 @@ export default function ReviewsPage() {
     } catch (err) {
       setError(getErrorMessage(err));
     }
+  }
+
+  function getLocalReplies(reviewId) {
+    return Array.isArray(replyThreads[reviewId]) ? replyThreads[reviewId] : [];
+  }
+
+  function updateReplyDraft(reviewId, content) {
+    setReplyDrafts((current) => ({
+      ...current,
+      [reviewId]: content,
+    }));
+  }
+
+  function submitReply(reviewId) {
+    const content = String(replyDrafts[reviewId] || '').trim();
+    if (!content) {
+      return;
+    }
+
+    const nextReply = {
+      id: `reply-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      author: 'Admin',
+      content,
+      created_at: new Date().toISOString(),
+    };
+
+    setReplyThreads((current) => ({
+      ...current,
+      [reviewId]: [...(Array.isArray(current[reviewId]) ? current[reviewId] : []), nextReply],
+    }));
+
+    setReplyDrafts((current) => ({
+      ...current,
+      [reviewId]: '',
+    }));
+  }
+
+  function formatReplyDate(value) {
+    if (!value) {
+      return 'Vua xong';
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return 'Vua xong';
+    }
+
+    return date.toLocaleString('vi-VN');
   }
 
   return (
@@ -67,16 +140,59 @@ export default function ReviewsPage() {
         {!reviews.length ? (
           <EmptyState message="No review data loaded." />
         ) : (
-          <DataTable
-            columns={[
-              { key: 'id', label: 'ID' },
-              { key: 'customer_id', label: 'Customer' },
-              { key: 'book_id', label: 'Book' },
-              { key: 'rating', label: 'Rating' },
-              { key: 'comment', label: 'Comment' },
-            ]}
-            rows={reviews}
-          />
+          <div className="sb-review-replies" style={{ gap: 14 }}>
+            {reviews.map((review) => (
+              <article key={review.id} className="panel">
+                <div className="sb-review-top" style={{ marginBottom: 8 }}>
+                  <div>
+                    <h3 style={{ margin: 0 }}>Review #{review.id}</h3>
+                    <small>Customer: {review.customer_id} · Book: {review.book_id}</small>
+                  </div>
+                  <div className="sb-review-stars-wrap">
+                    <span className="sb-review-stars">{'★★★★★'.slice(0, Number(review.rating || 0))}</span>
+                    <small>{Number(review.rating || 0).toFixed(1)}</small>
+                  </div>
+                </div>
+
+                <p style={{ margin: '0 0 10px' }}>{review.comment || 'No comment from this review.'}</p>
+
+                {getLocalReplies(review.id).length ? (
+                  <ul className="sb-review-reply-list">
+                    {getLocalReplies(review.id).map((item) => (
+                      <li key={item.id} className="sb-review-reply-item">
+                        <div className="sb-review-reply-head">
+                          <strong>{item.author || 'Admin'}</strong>
+                          <small>{formatReplyDate(item.created_at)}</small>
+                        </div>
+                        <p>{item.content}</p>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+
+                <div className="sb-review-reply-form" style={{ marginTop: 10 }}>
+                  <input
+                    placeholder="Tra loi review nay..."
+                    value={replyDrafts[review.id] || ''}
+                    onChange={(event) => updateReplyDraft(review.id, event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        submitReply(review.id);
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => submitReply(review.id)}
+                    disabled={!String(replyDrafts[review.id] || '').trim()}
+                  >
+                    Tra loi
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
         )}
       </SectionCard>
     </>
