@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 RABBITMQ_URL = os.environ.get("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
 EXCHANGE_NAME = "bookstore.topic"
 QUEUE_NAME = "ship_service_queue"
-BINDING_KEYS = ["shipping.reserve.requested", "shipping.compensate.requested"]
+BINDING_KEYS = ["shipment.create.requested", "shipping.compensate.requested"]
 
 
 def _process_message(ch, method, properties, body):
@@ -27,7 +27,6 @@ def _process_message(ch, method, properties, body):
         payload = data.get("payload", {})
         order_id = payload.get("order_id")
         customer_id = payload.get("customer_id")
-        force_shipping_failure = payload.get("force_shipping_failure", False)
 
         logger.info(
             "consumer_received event_type=%s saga_id=%s correlation_id=%s event_id=%s",
@@ -41,8 +40,8 @@ def _process_message(ch, method, properties, body):
             return
 
         with transaction.atomic():
-            if event_type == "shipping.reserve.requested":
-                _handle_shipping_reserve(order_id, customer_id, saga_id, correlation_id, force_shipping_failure)
+            if event_type == "shipment.create.requested":
+                _handle_shipment_create(order_id, customer_id, saga_id, correlation_id)
             elif event_type == "shipping.compensate.requested":
                 _handle_shipping_compensate(order_id, saga_id, correlation_id)
             else:
@@ -57,41 +56,20 @@ def _process_message(ch, method, properties, body):
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 
 
-def _handle_shipping_reserve(order_id, customer_id, saga_id, correlation_id, force_shipping_failure):
-    from app.events import publish_event
-    if force_shipping_failure:
-        shipment = Shipment.objects.create(
-            order_id=order_id, shipping_method="STANDARD",
-            address=f"Customer {customer_id} address", status="FAILED"
-        )
-        logger.warning("shipping_reserve_failed order_id=%s saga_id=%s (forced)", order_id, saga_id)
-        publish_event(
-            "shipping.reserve.completed",
-            {"order_id": order_id, "success": False, "shipment_id": shipment.id},
-            correlation_id=correlation_id, saga_id=saga_id
-        )
-    else:
-        shipment = Shipment.objects.create(
-            order_id=order_id, shipping_method="STANDARD",
-            address=f"Customer {customer_id} address", status="RESERVED"
-        )
-        logger.info("shipping_reserve_completed order_id=%s saga_id=%s shipment_id=%s", order_id, saga_id, shipment.id)
-        publish_event(
-            "shipping.reserve.completed",
-            {"order_id": order_id, "success": True, "shipment_id": shipment.id},
-            correlation_id=correlation_id, saga_id=saga_id
-        )
+def _handle_shipment_create(order_id, customer_id, saga_id, correlation_id):
+    """Just create Shipment with PENDING status, do not publish further events"""
+    shipment = Shipment.objects.create(
+        order_id=order_id,
+        shipping_method="STANDARD",
+        address=f"Customer {customer_id} address" if customer_id else "Standard address",
+        status="PENDING"
+    )
+    logger.info("shipment_created order_id=%s shipment_id=%s status=PENDING", order_id, shipment.id)
 
 
 def _handle_shipping_compensate(order_id, saga_id, correlation_id):
-    from app.events import publish_event
     updated = Shipment.objects.filter(order_id=order_id).update(status="CANCELLED")
-    logger.info("shipping_compensated order_id=%s saga_id=%s updated=%d", order_id, saga_id, updated)
-    publish_event(
-        "shipping.compensate.completed",
-        {"order_id": order_id, "success": True},
-        correlation_id=correlation_id, saga_id=saga_id
-    )
+    logger.info("shipping_compensated order_id=%s updated=%d", order_id, updated)
 
 
 class Command(BaseCommand):

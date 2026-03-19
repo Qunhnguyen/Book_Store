@@ -9,9 +9,9 @@ from app.views import (
     customers_ui, health_check, home_ui, managers_api, managers_ui,
     metrics_view, orders_api,
     orders_ui, payments_api, payments_by_order_api, payments_ui,
-    recommendations_api, recommendations_ui, reviews_api,
+    payment_process_api, recommendations_api, recommendations_ui, reviews_api,
     reviews_by_book_api, reviews_ui, shipments_api,
-    shipments_by_order_api, shipments_ui, staff_book_detail_api,
+    shipments_by_order_api, shipments_ui, shipment_deliver_api, staff_book_detail_api,
     staff_books_api, staff_delete_book_ui, staff_ui,
 )
 
@@ -38,8 +38,10 @@ urlpatterns = [
     path("api/orders/<int:customer_id>/", customer_orders_api),
     path("api/payments/", payments_api),
     path("api/payments/<int:order_id>/", payments_by_order_api),
+    path("api/payments/<int:payment_id>/process/", payment_process_api),
     path("api/shipments/", shipments_api),
     path("api/shipments/<int:order_id>/", shipments_by_order_api),
+    path("api/shipments/<int:shipment_id>/deliver/", shipment_deliver_api),
     path("api/reviews/", reviews_api),
     path("api/reviews/book/<int:book_id>/", reviews_by_book_api),
     path("api/managers/", managers_api),

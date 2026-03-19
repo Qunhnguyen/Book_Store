@@ -51,6 +51,78 @@ class ShipmentByOrder(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+class ShipmentUpdateDeliver(APIView):
+    """PATCH /api/shipments/{id}/deliver/ - Client confirms delivery (deliver or cancel)"""
+    def patch(self, request, shipment_id):
+        from .events import publish_event
+        from django.shortcuts import get_object_or_404
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
+        try:
+            shipment = get_object_or_404(Shipment, id=shipment_id)
+        except:
+            return Response({"error": "Shipment not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        if shipment.status != "PENDING":
+            return Response(
+                {"error": f"Shipment is already {shipment.status}, cannot be processed"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        action = request.data.get("action", "confirm").lower()
+        force_failure = request.data.get("force_failure", False)
+        
+        if action == "confirm":
+            if force_failure:
+                shipment.status = "FAILED"
+                shipment.save()
+                logger.warning("shipment_deliver_failed_forced shipment_id=%s", shipment_id)
+                
+                # Publish event to trigger compensation (refund)
+                publish_event(
+                    "payment.compensate.requested",
+                    {"order_id": shipment.order_id, "shipment_id": shipment.id, "message": "Forced failure"},
+                    correlation_id=None,
+                    saga_id=None
+                )
+            else:
+                shipment.status = "DELIVERED"
+                shipment.save()
+                logger.info("shipment_delivered shipment_id=%s order_id=%s", shipment_id, shipment.order_id)
+                
+                # Publish event to complete order
+                publish_event(
+                    "order.complete.requested",
+                    {"order_id": shipment.order_id, "shipment_id": shipment.id},
+                    correlation_id=None,
+                    saga_id=None
+                )
+            
+            serializer = ShipmentSerializer(shipment)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        
+        elif action == "cancel":
+            shipment.status = "FAILED"
+            shipment.save()
+            logger.info("shipment_cancelled shipment_id=%s", shipment_id)
+            
+            # Publish event to trigger compensation
+            publish_event(
+                "payment.compensate.requested",
+                {"order_id": shipment.order_id, "shipment_id": shipment.id, "message": "Cancelled by client"},
+                correlation_id=None,
+                saga_id=None
+            )
+            
+            serializer = ShipmentSerializer(shipment)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        
+        else:
+            return Response({"error": "Invalid action"}, status=status.HTTP_400_BAD_REQUEST)
+
+
 def health_check(request):
     """GET /health/ — liveness probe."""
     return JsonResponse({'status': 'ok', 'service': 'ship-service'})

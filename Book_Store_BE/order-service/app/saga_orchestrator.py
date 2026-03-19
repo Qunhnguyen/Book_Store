@@ -5,91 +5,91 @@ from .events import publish_event
 
 logger = logging.getLogger(__name__)
 
-def handle_payment_result(saga_id, success, message="", payload=None):
-    if payload is None: payload = {}
+def handle_payment_failed(saga_id, message="", payload=None):
+    """Handle when payment creation fails"""
+    if payload is None:
+        payload = {}
     try:
         order = Order.objects.get(saga_id=saga_id)
-        # Idempotency check: if order is already past PENDING, don't re-process payment reserve
         if order.status != "PENDING":
             logger.info(
-                "saga_payment_result_ignored saga_id=%s order_id=%s current_status=%s",
+                "saga_payment_failed_ignored saga_id=%s order_id=%s current_status=%s",
                 saga_id, order.id, order.status,
             )
             return
 
-        if success:
-            order.status = "PAYMENT_RESERVED"
-            order.save(update_fields=["status"])
-            logger.info(
-                "saga_payment_reserved saga_id=%s order_id=%s correlation_id=%s",
-                saga_id, order.id, order.correlation_id,
-            )
-
-            # Publish shipping reserve request
-            publish_payload = {
-                "order_id": order.id,
-                "customer_id": order.customer_id,
-                "force_shipping_failure": payload.get("force_shipping_failure", False)
-            }
-            publish_event("shipping.reserve.requested", publish_payload, correlation_id=order.correlation_id, saga_id=order.saga_id)
-        else:
-            order.status = "CANCELLED"
-            order.save(update_fields=["status"])
-            logger.warning(
-                "saga_payment_failed saga_id=%s order_id=%s message=%s",
-                saga_id, order.id, message,
-            )
+        order.status = "CANCELLED"
+        order.save(update_fields=["status"])
+        logger.warning(
+            "saga_payment_failed saga_id=%s order_id=%s message=%s",
+            saga_id, order.id, message,
+        )
     except Order.DoesNotExist:
-        logger.error("saga_order_not_found saga_id=%s event=payment_result", saga_id)
+        logger.error("saga_order_not_found saga_id=%s event=payment_failed", saga_id)
 
-def handle_shipping_result(saga_id, success, message="", payload=None):
-    if payload is None: payload = {}
+
+def handle_order_complete(saga_id, message="", payload=None):
+    """Handle when order delivery is confirmed by client"""
+    if payload is None:
+        payload = {}
     try:
         order = Order.objects.get(saga_id=saga_id)
-        # Idempotency check: only process shipping result if order is PAYMENT_RESERVED
-        if order.status != "PAYMENT_RESERVED":
+        if order.status != "SHIPPING":
             logger.info(
-                "saga_shipping_result_ignored saga_id=%s order_id=%s current_status=%s",
+                "saga_order_complete_ignored saga_id=%s order_id=%s current_status=%s",
                 saga_id, order.id, order.status,
             )
             return
 
-        if success:
-            order.status = "CONFIRMED"
-            order.save(update_fields=["status"])
-            logger.info(
-                "saga_confirmed saga_id=%s order_id=%s correlation_id=%s",
-                saga_id, order.id, order.correlation_id,
-            )
-        else:
-            order.status = "COMPENSATING"
-            order.save(update_fields=["status"])
-            logger.warning(
-                "saga_shipping_failed_compensating saga_id=%s order_id=%s message=%s",
-                saga_id, order.id, message,
-            )
-
-            # Start compensation
-            publish_payload = {
-                "order_id": order.id,
-                "customer_id": order.customer_id
-            }
-            publish_event("payment.compensate.requested", publish_payload, correlation_id=order.correlation_id, saga_id=order.saga_id)
+        order.status = "CONFIRMED"
+        order.save(update_fields=["status"])
+        logger.info(
+            "saga_order_confirmed saga_id=%s order_id=%s correlation_id=%s",
+            saga_id, order.id, order.correlation_id,
+        )
     except Order.DoesNotExist:
-        logger.error("saga_order_not_found saga_id=%s event=shipping_result", saga_id)
+        logger.error("saga_order_not_found saga_id=%s event=order_complete", saga_id)
 
-def handle_payment_compensate_result(saga_id, success, message="", payload=None):
-    if payload is None: payload = {}
+
+def handle_shipment_failed(saga_id, message="", payload=None):
+    """Handle when shipment fails - start compensation flow"""
+    if payload is None:
+        payload = {}
     try:
         order = Order.objects.get(saga_id=saga_id)
-        if order.status == "COMPENSATING":
+        if order.status != "SHIPPING":
+            logger.info(
+                "saga_shipment_failed_ignored saga_id=%s order_id=%s current_status=%s",
+                saga_id, order.id, order.status,
+            )
+            return
+
+        order.status = "CANCELLED"
+        order.save(update_fields=["status"])
+        logger.warning(
+            "saga_shipment_failed_start_compensation saga_id=%s order_id=%s message=%s",
+            saga_id, order.id, message,
+        )
+    except Order.DoesNotExist:
+        logger.error("saga_order_not_found saga_id=%s event=shipment_failed", saga_id)
+
+
+def handle_order_compensate_completed(saga_id, success, message="", payload=None):
+    """Handle when compensation (refund) is completed"""
+    if payload is None:
+        payload = {}
+    try:
+        order = Order.objects.get(saga_id=saga_id)
+        # If status is CANCELLED already, no need to update again
+        if order.status != "CANCELLED":
             order.status = "CANCELLED"
             order.save(update_fields=["status"])
-            logger.info(
-                "saga_cancelled_after_compensation saga_id=%s order_id=%s",
-                saga_id, order.id,
-            )
+            
+        logger.info(
+            "saga_order_compensated_completed saga_id=%s order_id=%s success=%s",
+            saga_id, order.id, success,
+        )
     except Order.DoesNotExist:
-        logger.error("saga_order_not_found saga_id=%s event=compensate_result", saga_id)
+        logger.error("saga_order_not_found saga_id=%s event=order_compensate_completed", saga_id)
 
 

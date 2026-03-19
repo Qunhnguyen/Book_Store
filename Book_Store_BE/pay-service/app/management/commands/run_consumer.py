@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 RABBITMQ_URL = os.environ.get("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
 EXCHANGE_NAME = "bookstore.topic"
 QUEUE_NAME = "pay_service_queue"
-BINDING_KEYS = ["payment.reserve.requested", "payment.compensate.requested"]
+BINDING_KEYS = ["payment.create.requested", "payment.compensate.requested"]
 
 
 def _process_message(ch, method, properties, body):
@@ -26,7 +26,6 @@ def _process_message(ch, method, properties, body):
         correlation_id = data.get("correlation_id", "")
         payload = data.get("payload", {})
         order_id = payload.get("order_id")
-        force_payment_failure = payload.get("force_payment_failure", False)
 
         logger.info(
             "consumer_received event_type=%s saga_id=%s correlation_id=%s event_id=%s",
@@ -40,8 +39,8 @@ def _process_message(ch, method, properties, body):
             return
 
         with transaction.atomic():
-            if event_type == "payment.reserve.requested":
-                _handle_payment_reserve(order_id, saga_id, correlation_id, force_payment_failure, payload)
+            if event_type == "payment.create.requested":
+                _handle_payment_create(order_id, saga_id, correlation_id)
             elif event_type == "payment.compensate.requested":
                 _handle_payment_compensate(order_id, saga_id, correlation_id)
             else:
@@ -56,26 +55,10 @@ def _process_message(ch, method, properties, body):
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 
 
-def _handle_payment_reserve(order_id, saga_id, correlation_id, force_payment_failure, payload):
-    from app.events import publish_event
-    if force_payment_failure:
-        payment = Payment.objects.create(order_id=order_id, payment_method="COD", status="FAILED")
-        logger.warning("payment_reserve_failed order_id=%s saga_id=%s (forced)", order_id, saga_id)
-        publish_event(
-            "payment.reserve.completed",
-            {"order_id": order_id, "success": False, "payment_id": payment.id,
-             "force_shipping_failure": payload.get("force_shipping_failure", False)},
-            correlation_id=correlation_id, saga_id=saga_id
-        )
-    else:
-        payment = Payment.objects.create(order_id=order_id, payment_method="COD", status="PAID")
-        logger.info("payment_reserve_completed order_id=%s saga_id=%s payment_id=%s", order_id, saga_id, payment.id)
-        publish_event(
-            "payment.reserve.completed",
-            {"order_id": order_id, "success": True, "payment_id": payment.id,
-             "force_shipping_failure": payload.get("force_shipping_failure", False)},
-            correlation_id=correlation_id, saga_id=saga_id
-        )
+def _handle_payment_create(order_id, saga_id, correlation_id):
+    """Just create Payment with PENDING status, do not publish further events"""
+    payment = Payment.objects.create(order_id=order_id, payment_method="COD", status="PENDING")
+    logger.info("payment_created order_id=%s saga_id=%s payment_id=%s status=PENDING", order_id, saga_id, payment.id)
 
 
 def _handle_payment_compensate(order_id, saga_id, correlation_id):
@@ -83,7 +66,7 @@ def _handle_payment_compensate(order_id, saga_id, correlation_id):
     updated = Payment.objects.filter(order_id=order_id).update(status="REFUNDED")
     logger.info("payment_compensated order_id=%s saga_id=%s updated=%d", order_id, saga_id, updated)
     publish_event(
-        "payment.compensate.completed",
+        "order.compensate.completed",
         {"order_id": order_id, "success": True},
         correlation_id=correlation_id, saga_id=saga_id
     )

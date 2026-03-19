@@ -122,7 +122,7 @@ class OrderListCreate(APIView):
         except requests.RequestException:
             pass
 
-        # Publish Event
+        # Publish Event to create payment (not reserve yet)
         payload = {
             "order_id": order.id,
             "customer_id": customer_id,
@@ -131,7 +131,7 @@ class OrderListCreate(APIView):
             "force_payment_failure": force_payment_failure,
             "force_shipping_failure": force_shipping_failure
         }
-        publish_event("payment.reserve.requested", payload, correlation_id=correlation_id, saga_id=saga_id)
+        publish_event("payment.create.requested", payload, correlation_id=correlation_id, saga_id=saga_id)
 
         return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
 

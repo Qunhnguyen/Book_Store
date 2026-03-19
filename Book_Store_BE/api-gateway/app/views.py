@@ -230,6 +230,18 @@ def recommendations_api(request):
     return _forward_request(request, RECOMMENDER_AI_SERVICE_URL, '/recommendations/')
 
 
+@csrf_exempt
+def payment_process_api(request, payment_id):
+    """PATCH /api/payments/{payment_id}/process/ - Forward to pay-service"""
+    return _forward_request(request, PAY_SERVICE_URL, f'/payments/{payment_id}/process/')
+
+
+@csrf_exempt
+def shipment_deliver_api(request, shipment_id):
+    """PATCH /api/shipments/{shipment_id}/deliver/ - Forward to ship-service"""
+    return _forward_request(request, SHIP_SERVICE_URL, f'/shipments/{shipment_id}/deliver/')
+
+
 def home_ui(request):
     return render(request, 'home.html')
 

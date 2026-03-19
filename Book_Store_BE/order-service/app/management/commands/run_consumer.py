@@ -13,14 +13,14 @@ logger = logging.getLogger(__name__)
 RABBITMQ_URL = os.environ.get("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
 EXCHANGE_NAME = "bookstore.topic"
 QUEUE_NAME = "order_service_queue"
-BINDING_KEYS = ["payment.reserve.completed", "shipping.reserve.completed", "payment.compensate.completed"]
+BINDING_KEYS = ["payment.failed", "order.complete.requested", "order.compensate.completed"]
 
 
 def _process_message(ch, method, properties, body):
     from app.saga_orchestrator import (
-        handle_payment_compensate_result,
-        handle_payment_result,
-        handle_shipping_result,
+        handle_order_compensate_completed,
+        handle_payment_failed,
+        handle_order_complete,
     )
     try:
         data = json.loads(body)
@@ -28,20 +28,19 @@ def _process_message(ch, method, properties, body):
         saga_id = data.get("saga_id", "")
         correlation_id = data.get("correlation_id", "")
         payload = data.get("payload", {})
-        success = payload.get("success", False)
         message = payload.get("message", "")
 
         logger.info(
-            "消费者收到事件 event_type=%s saga_id=%s correlation_id=%s success=%s",
-            event_type, saga_id, correlation_id, success,
+            "consumer_received event_type=%s saga_id=%s correlation_id=%s",
+            event_type, saga_id, correlation_id,
         )
 
-        if event_type == "payment.reserve.completed":
-            handle_payment_result(saga_id, success, message, payload)
-        elif event_type == "shipping.reserve.completed":
-            handle_shipping_result(saga_id, success, message, payload)
-        elif event_type == "payment.compensate.completed":
-            handle_payment_compensate_result(saga_id, success, message, payload)
+        if event_type == "payment.failed":
+            handle_payment_failed(saga_id, message, payload)
+        elif event_type == "order.complete.requested":
+            handle_order_complete(saga_id, message, payload)
+        elif event_type == "order.compensate.completed":
+            handle_order_compensate_completed(saga_id, True, message, payload)
         else:
             logger.warning("consumer_unknown_event event_type=%s", event_type)
 

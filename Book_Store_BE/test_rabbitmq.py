@@ -4,8 +4,8 @@ import requests
 import uuid
 
 # Get environment variables or default to localhost for test
-API_URL = "http://localhost:8000/api"
-RABBITMQ_MGMT_URL = "http://localhost:15672/api"
+API_URL = "http://api-gateway:8000/api"
+RABBITMQ_MGMT_URL = "http://rabbitmq:15672/api"
 
 print("=== 1. Creating user and Getting Token ===")
 email = f"testrabbit{uuid.uuid4().hex[:6]}@example.com"
@@ -19,9 +19,8 @@ headers = {"Authorization": f"Bearer {token}"}
 
 print("=== 2. Creating order ===")
 # We assume book 1 is seeded. Add to cart.
-requests.post(f"{API_URL}/carts/", json={"customer_id": customer_id}, headers=headers)
-cart = requests.get(f"http://localhost:8000/api/carts/{customer_id}/", headers=headers).json()
-cart_id = cart["id"]
+cart_create = requests.post(f"{API_URL}/carts/", json={"customer_id": customer_id}, headers=headers).json()
+cart_id = cart_create.get("id")
 
 requests.post(f"{API_URL}/cart-items/", json={"cart": cart_id, "book_id": 1, "quantity": 1}, headers=headers)
 
