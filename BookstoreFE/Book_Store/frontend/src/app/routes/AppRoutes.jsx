@@ -23,6 +23,7 @@ import CategoriesPage from '../../features/categories/CategoriesPage';
 import ManagersPage from '../../features/managers/ManagersPage';
 import StaffPage from '../../features/staff/StaffPage';
 import RecommendationsPage from '../../features/recommendations/RecommendationsPage';
+import AdminPage from '../../features/admin/AdminPage';
 
 export default function AppRoutes() {
   return (
@@ -51,6 +52,7 @@ export default function AppRoutes() {
       <Route path="/ops/managers" element={<ManagersPage />} />
       <Route path="/ops/staff" element={<StaffPage />} />
       <Route path="/ops/recommendations" element={<RecommendationsPage />} />
+      <Route path="/ops/admin" element={<AdminPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

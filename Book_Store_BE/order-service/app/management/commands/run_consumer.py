@@ -13,13 +13,14 @@ logger = logging.getLogger(__name__)
 RABBITMQ_URL = os.environ.get("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
 EXCHANGE_NAME = "bookstore.topic"
 QUEUE_NAME = "order_service_queue"
-BINDING_KEYS = ["payment.failed", "order.complete.requested", "order.compensate.completed"]
+BINDING_KEYS = ["payment.confirmed", "payment.failed", "order.complete.requested", "order.compensate.completed"]
 
 
 def _process_message(ch, method, properties, body):
     from app.saga_orchestrator import (
         handle_order_compensate_completed,
         handle_payment_failed,
+        handle_payment_confirmed,
         handle_order_complete,
     )
     try:
@@ -35,7 +36,9 @@ def _process_message(ch, method, properties, body):
             event_type, saga_id, correlation_id,
         )
 
-        if event_type == "payment.failed":
+        if event_type == "payment.confirmed":
+            handle_payment_confirmed(saga_id, message, payload)
+        elif event_type == "payment.failed":
             handle_payment_failed(saga_id, message, payload)
         elif event_type == "order.complete.requested":
             handle_order_complete(saga_id, message, payload)

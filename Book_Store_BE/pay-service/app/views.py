@@ -92,10 +92,18 @@ class PaymentUpdateProcess(APIView):
                 payment.save()
                 logger.info("payment_process_paid payment_id=%s order_id=%s", payment_id, payment.order_id)
                 
-                # Publish event to create shipment
+                # Publish TWO events:
+                # 1. Event to order-service to update order status PENDING -> SHIPPING
+                publish_event(
+                    "payment.confirmed",
+                    {"order_id": payment.order_id, "payment_id": payment.id},
+                    correlation_id=None,
+                    saga_id=None
+                )
+                # 2. Event to create shipment
                 publish_event(
                     "shipment.create.requested",
-                    {"order_id": payment.order_id, "customer_id": None},  # Shipment will fetch order
+                    {"order_id": payment.order_id, "customer_id": None},
                     correlation_id=None,
                     saga_id=None
                 )
