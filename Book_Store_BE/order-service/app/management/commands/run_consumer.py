@@ -3,9 +3,7 @@ import logging
 import os
 import time
 
-import django
 import pika
-
 from django.core.management.base import BaseCommand
 
 logger = logging.getLogger(__name__)
@@ -13,11 +11,22 @@ logger = logging.getLogger(__name__)
 RABBITMQ_URL = os.environ.get("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
 EXCHANGE_NAME = "bookstore.topic"
 QUEUE_NAME = "order_service_queue"
-BINDING_KEYS = ["payment.reserve.completed", "shipping.reserve.completed", "payment.compensate.completed"]
+BINDING_KEYS = [
+    "inventory.reserve.completed",
+    "payment.reserve.completed",
+    "shipping.reserve.completed",
+    "payment.compensate.completed",
+    "inventory.commit.completed",
+    "inventory.release.completed",
+]
 
 
 def _process_message(ch, method, properties, body):
+    data = {}
     from app.saga_orchestrator import (
+        handle_inventory_commit_result,
+        handle_inventory_release_result,
+        handle_inventory_result,
         handle_payment_compensate_result,
         handle_payment_result,
         handle_shipping_result,
@@ -32,23 +41,29 @@ def _process_message(ch, method, properties, body):
         message = payload.get("message", "")
 
         logger.info(
-            "消费者收到事件 event_type=%s saga_id=%s correlation_id=%s success=%s",
+            "consumer_received event_type=%s saga_id=%s correlation_id=%s success=%s",
             event_type, saga_id, correlation_id, success,
         )
 
-        if event_type == "payment.reserve.completed":
+        if event_type == "inventory.reserve.completed":
+            handle_inventory_result(saga_id, success, message, payload)
+        elif event_type == "payment.reserve.completed":
             handle_payment_result(saga_id, success, message, payload)
         elif event_type == "shipping.reserve.completed":
             handle_shipping_result(saga_id, success, message, payload)
         elif event_type == "payment.compensate.completed":
             handle_payment_compensate_result(saga_id, success, message, payload)
+        elif event_type == "inventory.commit.completed":
+            handle_inventory_commit_result(saga_id, success, message, payload)
+        elif event_type == "inventory.release.completed":
+            handle_inventory_release_result(saga_id, success, message, payload)
         else:
             logger.warning("consumer_unknown_event event_type=%s", event_type)
 
         ch.basic_ack(delivery_tag=method.delivery_tag)
     except Exception as exc:
         logger.exception("consumer_processing_error saga_id=%s error=%s", data.get("saga_id", ""), exc)
-        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
 
 
 class Command(BaseCommand):
@@ -72,12 +87,11 @@ class Command(BaseCommand):
                 logger.info("order-consumer started, waiting for events on queue=%s", QUEUE_NAME)
                 channel.start_consuming()
             except pika.exceptions.AMQPConnectionError as exc:
-                logger.warning("order-consumer connection lost: %s — reconnecting in 5s", exc)
+                logger.warning("order-consumer connection lost: %s - reconnecting in 5s", exc)
                 time.sleep(5)
             except KeyboardInterrupt:
                 logger.info("order-consumer stopped")
                 break
             except Exception as exc:
-                logger.exception("order-consumer unexpected error: %s — reconnecting in 5s", exc)
+                logger.exception("order-consumer unexpected error: %s - reconnecting in 5s", exc)
                 time.sleep(5)
-

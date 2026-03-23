@@ -21,6 +21,7 @@ SERVICES=(
   "pay-service"
   "recommender-ai-service"
   "ship-service"
+  "inventory-service"
   "staff-service"
 )
 
@@ -35,3 +36,5 @@ done
 
 echo "----------------------------------------"
 echo "Databases created successfully!"
+
+

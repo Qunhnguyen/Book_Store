@@ -17,7 +17,15 @@ QUEUE_NAME = "ship_service_queue"
 BINDING_KEYS = ["shipping.reserve.requested", "shipping.compensate.requested"]
 
 
+def _publish_or_raise(event_type, payload, correlation_id, saga_id):
+    from app.events import publish_event
+
+    if not publish_event(event_type, payload, correlation_id=correlation_id, saga_id=saga_id):
+        raise RuntimeError(f"Failed to publish {event_type}")
+
+
 def _process_message(ch, method, properties, body):
+    data = {}
     try:
         data = json.loads(body)
         event_type = data.get("event_type")
@@ -34,9 +42,8 @@ def _process_message(ch, method, properties, body):
             event_type, saga_id, correlation_id, event_id,
         )
 
-        # Idempotency check
         if ProcessedEvent.objects.filter(event_id=event_id).exists():
-            logger.info("consumer_duplicate_event event_id=%s — skipping", event_id)
+            logger.info("consumer_duplicate_event event_id=%s - skipping", event_id)
             ch.basic_ack(delivery_tag=method.delivery_tag)
             return
 
@@ -54,43 +61,48 @@ def _process_message(ch, method, properties, body):
 
     except Exception as exc:
         logger.exception("consumer_processing_error event_id=%s error=%s", data.get("event_id", ""), exc)
-        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
 
 
 def _handle_shipping_reserve(order_id, customer_id, saga_id, correlation_id, force_shipping_failure):
-    from app.events import publish_event
     if force_shipping_failure:
         shipment = Shipment.objects.create(
-            order_id=order_id, shipping_method="STANDARD",
-            address=f"Customer {customer_id} address", status="FAILED"
+            order_id=order_id,
+            shipping_method="STANDARD",
+            address=f"Customer {customer_id} address",
+            status="FAILED",
         )
         logger.warning("shipping_reserve_failed order_id=%s saga_id=%s (forced)", order_id, saga_id)
-        publish_event(
+        _publish_or_raise(
             "shipping.reserve.completed",
             {"order_id": order_id, "success": False, "shipment_id": shipment.id},
-            correlation_id=correlation_id, saga_id=saga_id
+            correlation_id=correlation_id,
+            saga_id=saga_id,
         )
     else:
         shipment = Shipment.objects.create(
-            order_id=order_id, shipping_method="STANDARD",
-            address=f"Customer {customer_id} address", status="RESERVED"
+            order_id=order_id,
+            shipping_method="STANDARD",
+            address=f"Customer {customer_id} address",
+            status="RESERVED",
         )
         logger.info("shipping_reserve_completed order_id=%s saga_id=%s shipment_id=%s", order_id, saga_id, shipment.id)
-        publish_event(
+        _publish_or_raise(
             "shipping.reserve.completed",
             {"order_id": order_id, "success": True, "shipment_id": shipment.id},
-            correlation_id=correlation_id, saga_id=saga_id
+            correlation_id=correlation_id,
+            saga_id=saga_id,
         )
 
 
 def _handle_shipping_compensate(order_id, saga_id, correlation_id):
-    from app.events import publish_event
     updated = Shipment.objects.filter(order_id=order_id).update(status="CANCELLED")
     logger.info("shipping_compensated order_id=%s saga_id=%s updated=%d", order_id, saga_id, updated)
-    publish_event(
+    _publish_or_raise(
         "shipping.compensate.completed",
         {"order_id": order_id, "success": True},
-        correlation_id=correlation_id, saga_id=saga_id
+        correlation_id=correlation_id,
+        saga_id=saga_id,
     )
 
 
@@ -115,11 +127,11 @@ class Command(BaseCommand):
                 logger.info("ship-consumer started, waiting for events on queue=%s", QUEUE_NAME)
                 channel.start_consuming()
             except pika.exceptions.AMQPConnectionError as exc:
-                logger.warning("ship-consumer connection lost: %s — reconnecting in 5s", exc)
+                logger.warning("ship-consumer connection lost: %s - reconnecting in 5s", exc)
                 time.sleep(5)
             except KeyboardInterrupt:
                 logger.info("ship-consumer stopped")
                 break
             except Exception as exc:
-                logger.exception("ship-consumer unexpected error: %s — reconnecting in 5s", exc)
+                logger.exception("ship-consumer unexpected error: %s - reconnecting in 5s", exc)
                 time.sleep(5)

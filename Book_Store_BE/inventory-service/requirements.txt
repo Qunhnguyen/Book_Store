@@ -1,7 +1,7 @@
 django
 djangorestframework
-celery
-redis
+requests
 
 psycopg2-binary
-requests
+pika
+prometheus-client

@@ -144,6 +144,35 @@ services:
       - postgres
       - rabbitmq
 
+  inventory-service:
+    build: ./inventory-service
+    ports:
+      - "8013:8000"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=inventory_db
+      - DB_USER=inventory_db
+      - DB_PASSWORD=inventory_db
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      - postgres
+      - rabbitmq
+
+  inventory-consumer:
+    build: ./inventory-service
+    restart: always
+    command: ["/wait-for-postgres.sh", "postgres", "python", "manage.py", "run_consumer"]
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=inventory_db
+      - DB_USER=inventory_db
+      - DB_PASSWORD=inventory_db
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      - postgres
+      - rabbitmq
   comment-rate-service:
     build: ./comment-rate-service
     ports:
@@ -247,7 +276,7 @@ services:
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
-      - POSTGRES_MULTIPLE_DATABASES=customer_db,book_db,cart_db,staff_db,order_db,pay_db,ship_db,comment_rate_db,manager_db,catalog_db,recommender_db,gateway_db,image_db
+      - POSTGRES_MULTIPLE_DATABASES=customer_db,book_db,cart_db,staff_db,order_db,pay_db,ship_db,inventory_db,comment_rate_db,manager_db,catalog_db,recommender_db,gateway_db,image_db
     ports:
       - "5432:5432"
     volumes:
@@ -263,3 +292,4 @@ services:
 
 volumes:
   postgres_data:
+

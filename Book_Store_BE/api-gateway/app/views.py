@@ -1,3 +1,4 @@
+﻿import json
 import logging
 import time
 import requests
@@ -30,7 +31,7 @@ _error_count = 0
 
 def _extract_service_name(service_url: str) -> str:
     """Extract a short service name from the URL for circuit breaker keying."""
-    # e.g. 'http://book-service:8000' → 'book-service'
+    # e.g. 'http://book-service:8000' ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ 'book-service'
     return service_url.split('//')[1].split(':')[0]
 
 
@@ -58,16 +59,26 @@ def _forward_request(request, service_url, upstream_path):
     _request_count += 1
     start_time = time.time()
 
+    request_kwargs = {
+        'method': request.method,
+        'url': f'{service_url}{upstream_path}',
+        'params': request.GET,
+        'headers': headers,
+        'timeout': REQUEST_TIMEOUT_SECONDS,
+    }
+    raw_body = request.body or None
+    if raw_body is not None:
+        if content_type and 'application/json' in content_type.lower():
+            try:
+                request_kwargs['json'] = json.loads(raw_body.decode('utf-8'))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                request_kwargs['data'] = raw_body
+        else:
+            request_kwargs['data'] = raw_body
+
     try:
         with breaker:
-            response = requests.request(
-                method=request.method,
-                url=f'{service_url}{upstream_path}',
-                params=request.GET,
-                data=request.body or None,
-                headers=headers,
-                timeout=REQUEST_TIMEOUT_SECONDS,
-            )
+            response = requests.request(**request_kwargs)
     except CircuitBreakerOpen:
         _error_count += 1
         logger.warning(
@@ -97,18 +108,17 @@ def _forward_request(request, service_url, upstream_path):
         content_type=response_content_type,
     )
 
-
 # ---------------------------------------------------------------------------
 # Observability endpoints
 # ---------------------------------------------------------------------------
 
 def health_check(request):
-    """GET /api/health/ — liveness probe, no JWT required."""
+    """GET /api/health/ ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â liveness probe, no JWT required."""
     return JsonResponse({'status': 'ok', 'service': 'api-gateway'})
 
 
 def metrics_view(request):
-    """GET /api/metrics/ — Prometheus text format, no JWT required."""
+    """GET /api/metrics/ ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â Prometheus text format, no JWT required."""
     lines = [
         '# HELP gateway_requests_total Total HTTP requests proxied by api-gateway',
         '# TYPE gateway_requests_total counter',
@@ -216,6 +226,11 @@ def categories_api(request):
 
 
 @csrf_exempt
+def category_detail_api(request, category_id):
+    return _forward_request(request, CATALOG_SERVICE_URL, f'/categories/{category_id}/')
+
+
+@csrf_exempt
 def staff_books_api(request):
     return _forward_request(request, STAFF_SERVICE_URL, '/staff/books/')
 
@@ -241,6 +256,7 @@ def books_ui(request):
             'author': request.POST.get('author'),
             'price': request.POST.get('price'),
             'stock': request.POST.get('stock'),
+            'category_ids': [int(category_id) for category_id in request.POST.getlist('category_ids') if category_id],
         }
         try:
             requests.post(f'{BOOK_SERVICE_URL}/books/', json=data, timeout=3)
@@ -249,14 +265,22 @@ def books_ui(request):
         return redirect('/books-ui/')
 
     books = []
+    categories = []
     try:
-        r = requests.get(f'{BOOK_SERVICE_URL}/books/', timeout=3)
-        if r.status_code == 200:
-            books = r.json()
+        response = requests.get(f'{BOOK_SERVICE_URL}/books/', timeout=3)
+        if response.status_code == 200:
+            books = response.json()
     except requests.RequestException:
         books = []
-    return render(request, 'books.html', {'books': books})
 
+    try:
+        response = requests.get(f'{CATALOG_SERVICE_URL}/categories/', timeout=3)
+        if response.status_code == 200:
+            categories = response.json()
+    except requests.RequestException:
+        categories = []
+
+    return render(request, 'books.html', {'books': books, 'categories': categories})
 
 def cart_ui(request, customer_id):
     if request.method == 'POST':
@@ -455,3 +479,4 @@ def staff_delete_book_ui(request, book_id):
         except requests.RequestException:
             pass
     return redirect('/staff-ui/')
+

@@ -1,4 +1,4 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 
 {% block title %}BookStore - Sách{% endblock %}
 {% block nav_books %}active{% endblock %}
@@ -25,7 +25,7 @@
         {% if books %}
         <div class="card">
             <div class="table-responsive">
-                <table class="table table-hover mb-0">
+                <table class="table table-hover mb-0 align-middle">
                     <thead>
                         <tr>
                             <th>#</th>
@@ -33,6 +33,7 @@
                             <th>Tác giả</th>
                             <th>Giá</th>
                             <th>Tồn kho</th>
+                            <th>Danh mục</th>
                             <th>Hành động</th>
                         </tr>
                     </thead>
@@ -48,6 +49,15 @@
                                     <span class="badge bg-success">{{ book.stock }}</span>
                                 {% else %}
                                     <span class="badge bg-danger">Hết hàng</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if book.categories %}
+                                    {% for category in book.categories %}
+                                        <span class="badge rounded-pill bg-info text-dark me-1 mb-1">{{ category.name }}</span>
+                                    {% endfor %}
+                                {% else %}
+                                    <span class="text-muted small">Chưa gắn danh mục</span>
                                 {% endif %}
                             </td>
                             <td>
@@ -96,6 +106,15 @@
                         <label class="form-label fw-bold">Số lượng tồn kho</label>
                         <input type="number" name="stock" class="form-control" required placeholder="0" min="0">
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Danh mục</label>
+                        <select name="category_ids" class="form-select" multiple size="5">
+                            {% for category in categories %}
+                            <option value="{{ category.id }}">{{ category.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Giữ Ctrl hoặc Cmd để chọn nhiều danh mục.</div>
+                    </div>
                     <button type="submit" class="btn btn-primary w-100">
                         <i class="bi bi-plus-lg me-1"></i>Thêm sách
                     </button>
@@ -105,7 +124,6 @@
     </div>
 </div>
 
-<!-- Add Book Modal -->
 <div class="modal fade" id="addBookModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -131,6 +149,14 @@
                     <div class="mb-3">
                         <label class="form-label fw-bold">Số lượng tồn kho</label>
                         <input type="number" name="stock" class="form-control" required min="0">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Danh mục</label>
+                        <select name="category_ids" class="form-select" multiple size="5">
+                            {% for category in categories %}
+                            <option value="{{ category.id }}">{{ category.name }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
                 </div>
                 <div class="modal-footer">
