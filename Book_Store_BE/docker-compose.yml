@@ -257,7 +257,6 @@ services:
       - DB_NAME=image_db
       - DB_USER=image_db
       - DB_PASSWORD=image_db
-      - OPENAI_API_KEY=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
 
   image-worker:
     build: ./image-service
@@ -271,7 +270,6 @@ services:
       - DB_NAME=image_db
       - DB_USER=image_db
       - DB_PASSWORD=image_db
-      - OPENAI_API_KEY=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
 
   postgres:
     image: postgres:15-alpine
