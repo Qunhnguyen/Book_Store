@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y postgresql-client && rm -rf /var/lib/ap
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY wait-for-postgres.sh /wait-for-postgres.sh
+RUN sed -i 's/\r$//' /wait-for-postgres.sh
 RUN chmod +x /wait-for-postgres.sh
 
 COPY . .

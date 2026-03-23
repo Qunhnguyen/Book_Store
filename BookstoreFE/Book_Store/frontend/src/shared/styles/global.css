@@ -1397,6 +1397,13 @@ td {
   background: #fff;
   padding: 8px 14px;
   font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.sb-filter-btn:hover {
+  background: #f0f3ff;
+  border-color: #a8b2e8;
 }
 
 .sb-book-grid {
@@ -1412,6 +1419,13 @@ td {
   border-radius: 14px;
   box-shadow: var(--sb-shadow);
   padding: 10px;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sb-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 18px 42px rgba(14, 24, 54, 0.14);
 }
 
 .sb-stock {
@@ -1463,15 +1477,26 @@ td {
 }
 
 .sb-mini-btn {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   display: inline-flex;
   justify-content: center;
   align-items: center;
-  background: #eceef9;
-  color: #2f37ad;
-  font-weight: 900;
+  background: var(--sb-brand);
+  color: #fff;
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+.sb-mini-btn:hover {
+  background: var(--sb-brand-dark);
+  transform: scale(1.12);
 }
 
 .sb-center {

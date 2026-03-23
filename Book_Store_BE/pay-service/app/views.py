@@ -56,6 +56,47 @@ class PaymentByOrder(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+class PaymentApprove(APIView):
+    def post(self, request, order_id):
+        is_approved = request.data.get("approved", True)
+        payment = Payment.objects.filter(order_id=order_id, status="PENDING").last()
+        if not payment:
+            return Response({"error": "No PENDING payment found for this order"}, status=status.HTTP_404_NOT_FOUND)
+            
+        from app.events import publish_event
+        if is_approved:
+            payment.status = "PAID"
+            payment.save(update_fields=["status"])
+            
+            publish_event(
+                "payment.reserve.completed",
+                {
+                    "order_id": order_id,
+                    "success": True,
+                    "payment_id": payment.id,
+                    "force_shipping_failure": payment.force_shipping_failure,
+                },
+                correlation_id=payment.correlation_id,
+                saga_id=payment.saga_id,
+            )
+        else:
+            payment.status = "FAILED"
+            payment.save(update_fields=["status"])
+            publish_event(
+                "payment.reserve.completed",
+                {
+                    "order_id": order_id,
+                    "success": False,
+                    "payment_id": payment.id,
+                    "force_shipping_failure": payment.force_shipping_failure,
+                },
+                correlation_id=payment.correlation_id,
+                saga_id=payment.saga_id,
+            )
+            
+        return Response(PaymentSerializer(payment).data, status=status.HTTP_200_OK)
+
+
 def health_check(request):
     """GET /health/ — liveness probe."""
     return JsonResponse({'status': 'ok', 'service': 'pay-service'})

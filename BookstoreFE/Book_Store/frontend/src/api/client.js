@@ -78,18 +78,22 @@ export const OrdersApi = {
   list: () => api.get('/api/orders/'),
   create: (customer_id) => api.post('/api/orders/', { customer_id }),
   listByCustomer: (customerId) => api.get(`/api/orders/${customerId}/`),
+  updateStatus: (orderId, status) => api.patch(`/api/orders/${orderId}/status/`, { status }),
+  confirm: (orderId) => api.post(`/api/orders/${orderId}/confirm/`, {}),
 };
 
 export const PaymentsApi = {
   list: () => api.get('/api/payments/'),
   create: (payload) => api.post('/api/payments/', payload),
   listByOrder: (orderId) => api.get(`/api/payments/${orderId}/`),
+  approve: (orderId, approved) => api.post(`/api/payments/${orderId}/approve/`, { approved }),
 };
 
 export const ShipmentsApi = {
   list: () => api.get('/api/shipments/'),
   create: (payload) => api.post('/api/shipments/', payload),
   listByOrder: (orderId) => api.get(`/api/shipments/${orderId}/`),
+  approve: (orderId, approved) => api.post(`/api/shipments/${orderId}/approve/`, { approved }),
 };
 
 export const ReviewsApi = {

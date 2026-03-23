@@ -1,4 +1,4 @@
-﻿import json
+import json
 import logging
 import time
 import requests
@@ -194,6 +194,10 @@ def payments_api(request):
 def payments_by_order_api(request, order_id):
     return _forward_request(request, PAY_SERVICE_URL, f'/payments/{order_id}/')
 
+@csrf_exempt
+def payments_approve_api(request, order_id):
+    return _forward_request(request, PAY_SERVICE_URL, f'/payments/{order_id}/approve/')
+
 
 @csrf_exempt
 def shipments_api(request):
@@ -203,6 +207,10 @@ def shipments_api(request):
 @csrf_exempt
 def shipments_by_order_api(request, order_id):
     return _forward_request(request, SHIP_SERVICE_URL, f'/shipments/{order_id}/')
+
+@csrf_exempt
+def shipments_approve_api(request, order_id):
+    return _forward_request(request, SHIP_SERVICE_URL, f'/shipments/{order_id}/approve/')
 
 
 @csrf_exempt

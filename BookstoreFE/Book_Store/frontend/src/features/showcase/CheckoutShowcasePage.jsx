@@ -230,11 +230,13 @@ export default function CheckoutShowcasePage() {
                     <tr>
                       <td colSpan="4" style={{ textAlign: 'center', color: '#94a3b8' }}>Chưa có đơn hàng nào</td>
                     </tr>
-                  ) : orders.slice(0, 3).map((order) => {
-                    const statusClass = 
-                      order.status === 'CREATED' ? 'primary' : 
-                      order.status === 'PENDING' ? 'warning' : 'success';
-                      
+                  ) : [...orders].reverse().slice(0, 5).map((order) => {
+                    const statusClass =
+                      order.status === 'CONFIRMED' ? 'success' :
+                      order.status === 'AWAITING_CONFIRMATION' ? 'primary' :
+                      order.status === 'PENDING' || order.status === 'INVENTORY_RESERVED' || order.status === 'PAYMENT_RESERVED' ? 'warning' :
+                      order.status === 'CANCELLED' || order.status === 'FAILED' ? 'danger' : 'primary';
+
                     return (
                       <tr key={order.id}>
                         <td style={{ fontWeight: 600 }}>#ORD-{order.id}</td>

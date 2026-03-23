@@ -295,18 +295,29 @@ export default function ProductDetailShowcasePage() {
             <div className="sb-panel" style={{ marginTop: '20px', marginBottom: '20px' }}>
               <h3 style={{ marginTop: 0 }}>Write Your Review</h3>
               <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>Rating (1-5)</label>
-                <select 
-                  value={reviewRating} 
-                  onChange={(e) => setReviewRating(Number(e.target.value))}
-                  style={{ padding: '8px', border: '1px solid #ccc', borderRadius: '4px', width: '100px' }}
-                >
-                  <option value={5}>5 Stars</option>
-                  <option value={4}>4 Stars</option>
-                  <option value={3}>3 Stars</option>
-                  <option value={2}>2 Stars</option>
-                  <option value={1}>1 Star</option>
-                </select>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Your Rating</label>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setReviewRating(star)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '32px',
+                        padding: '0',
+                        color: star <= reviewRating ? '#f4a80b' : '#d0d4e8',
+                        transition: 'color 0.15s ease, transform 0.15s ease',
+                        transform: star <= reviewRating ? 'scale(1.1)' : 'scale(1)',
+                      }}
+                      aria-label={`Rate ${star} star${star > 1 ? 's' : ''}`}
+                    >
+                      ★
+                    </button>
+                  ))}
+                </div>
               </div>
               <div style={{ marginBottom: '12px' }}>
                 <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>Comment</label>

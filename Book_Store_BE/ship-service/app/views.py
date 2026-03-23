@@ -51,6 +51,45 @@ class ShipmentByOrder(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+class ShipmentApprove(APIView):
+    def post(self, request, order_id):
+        is_approved = request.data.get("approved", True)
+        shipment = Shipment.objects.filter(order_id=order_id, status="PENDING").last()
+        if not shipment:
+            return Response({"error": "No PENDING shipment found for this order"}, status=status.HTTP_404_NOT_FOUND)
+            
+        from app.events import publish_event
+        if is_approved:
+            shipment.status = "RESERVED"
+            shipment.save(update_fields=["status"])
+            
+            publish_event(
+                "shipping.reserve.completed",
+                {
+                    "order_id": order_id,
+                    "success": True,
+                    "shipment_id": shipment.id,
+                },
+                correlation_id=shipment.correlation_id,
+                saga_id=shipment.saga_id,
+            )
+        else:
+            shipment.status = "FAILED"
+            shipment.save(update_fields=["status"])
+            publish_event(
+                "shipping.reserve.completed",
+                {
+                    "order_id": order_id,
+                    "success": False,
+                    "shipment_id": shipment.id,
+                },
+                correlation_id=shipment.correlation_id,
+                saga_id=shipment.saga_id,
+            )
+            
+        return Response(ShipmentSerializer(shipment).data, status=status.HTTP_200_OK)
+
+
 def health_check(request):
     """GET /health/ — liveness probe."""
     return JsonResponse({'status': 'ok', 'service': 'ship-service'})

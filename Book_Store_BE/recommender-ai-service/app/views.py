@@ -20,6 +20,9 @@ class RecommendationList(APIView):
 
         in_stock_books = [
             b for b in books if isinstance(b, dict) and int(b.get("stock", 0)) > 0
+            and "smoke" not in b.get("title", "").lower()
+            and "integration" not in b.get("title", "").lower()
+            and "codex" not in b.get("author", "").lower()
         ]
 
         recommendations = in_stock_books[:5]

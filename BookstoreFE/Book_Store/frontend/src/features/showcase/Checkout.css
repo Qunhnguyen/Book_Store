@@ -269,6 +269,11 @@
   color: #166534;
 }
 
+.ck-status-pill.danger {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
 .ck-summary-item {
   display: flex;
   align-items: center;

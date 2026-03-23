@@ -168,20 +168,33 @@ export default function AdminShowcasePage() {
           ordersData,
           customersData,
           categoriesData,
-          reviewsData
+          reviewsData,
+          paymentsData,
+          shipmentsData
         ] = await Promise.all([
           BooksApi.list(),
           OrdersApi.list(),
           CustomersApi.list(),
           CategoriesApi.list(),
-          ReviewsApi.list()
+          ReviewsApi.list(),
+          PaymentsApi.list(),
+          ShipmentsApi.list()
         ]);
 
         setBooks(Array.isArray(booksData) ? booksData : []);
-        setOrders(Array.isArray(ordersData) ? ordersData : []);
         setCustomers(Array.isArray(customersData) ? customersData : []);
         setCategories(Array.isArray(categoriesData) ? categoriesData : []);
         setReviews(Array.isArray(reviewsData) ? reviewsData : []);
+        
+        const paymentsList = Array.isArray(paymentsData) ? paymentsData : [];
+        const shipmentsList = Array.isArray(shipmentsData) ? shipmentsData : [];
+        
+        const enrichedOrders = (Array.isArray(ordersData) ? ordersData : []).map(order => {
+          const payment = paymentsList.find(p => p.order_id === order.id) || null;
+          const shipment = shipmentsList.find(s => s.order_id === order.id) || null;
+          return { ...order, payment, shipment };
+        });
+        setOrders(enrichedOrders);
 
       } catch (error) {
         setBookError(getErrorMessage(error));
@@ -328,6 +341,58 @@ export default function AdminShowcasePage() {
     window.alert(`Exported ${filteredCustomers.length} customers.`);
   }
 
+  async function updateOrderStatus(orderId, newStatus) {
+    try {
+      await OrdersApi.updateStatus(orderId, newStatus);
+      setOrders((current) =>
+        current.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
+      );
+    } catch (err) {
+      window.alert(`Loi khi cap nhat trang thai: ${getErrorMessage(err)}`);
+    }
+  }
+
+  async function confirmOrder(orderId) {
+    try {
+      await OrdersApi.confirm(orderId);
+      setOrders((current) =>
+        current.map((o) => (o.id === orderId ? { ...o, status: 'CONFIRMED' } : o))
+      );
+    } catch (err) {
+      window.alert(`Loi khi duyet don hang: ${getErrorMessage(err)}`);
+    }
+  }
+
+  async function approvePayment(orderId, isApproved) {
+    try {
+      await PaymentsApi.approve(orderId, isApproved);
+      // Optimistically update
+      setOrders(current => current.map(o => {
+        if (o.id === orderId && o.payment) {
+          return { ...o, payment: { ...o.payment, status: isApproved ? 'PAID' : 'FAILED' } };
+        }
+        return o;
+      }));
+    } catch (err) {
+      window.alert(`Loi khi duyet thanh toan: ${getErrorMessage(err)}`);
+    }
+  }
+
+  async function approveShipment(orderId, isApproved) {
+    try {
+      await ShipmentsApi.approve(orderId, isApproved);
+      // Optimistically update
+      setOrders(current => current.map(o => {
+        if (o.id === orderId && o.shipment) {
+          return { ...o, shipment: { ...o.shipment, status: isApproved ? 'RESERVED' : 'FAILED' } };
+        }
+        return o;
+      }));
+    } catch (err) {
+      window.alert(`Loi khi duyet van chuyen: ${getErrorMessage(err)}`);
+    }
+  }
+
   function renderOrders() {
     return (
       <>
@@ -366,9 +431,10 @@ export default function AdminShowcasePage() {
                 <tr>
                   <th>MA DON</th>
                   <th>KHACH HANG</th>
-                  <th>NGAY DAT</th>
+                  <th>THONG TIN TT/VC</th>
                   <th>TONG TIEN</th>
                   <th>TRANG THAI</th>
+                  <th>THAO TAC</th>
                 </tr>
               </thead>
               <tbody>
@@ -381,14 +447,91 @@ export default function AdminShowcasePage() {
                         <span>{order.customer}</span>
                       </div>
                     </td>
-                    <td>{order.date}</td>
+                    <td>
+                      <div style={{ fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div>
+                          <strong>TT:</strong> {order.payment ? (
+                            <span className={`sb-admin-lite-status ${order.payment.status === 'PAID' ? 'ok' : order.payment.status === 'FAILED' ? 'warn' : 'info'}`} style={{ transform: 'scale(0.8)', padding: '2px 6px' }}>
+                              {order.payment.status}
+                            </span>
+                          ) : <span style={{ color: '#94a3b8' }}>Chua co</span>}
+                        </div>
+                        <div>
+                          <strong>VC:</strong> {order.shipment ? (
+                            <span className={`sb-admin-lite-status ${order.shipment.status === 'RESERVED' ? 'ok' : order.shipment.status === 'FAILED' ? 'warn' : 'info'}`} style={{ transform: 'scale(0.8)', padding: '2px 6px' }}>
+                              {order.shipment.status}
+                            </span>
+                          ) : <span style={{ color: '#94a3b8' }}>Chua co</span>}
+                        </div>
+                      </div>
+                    </td>
                     <td><strong>{toVnd(order.total)}</strong></td>
                     <td>
-                      <span className={`sb-admin-lite-status ${order.tone}`}>{order.status}</span>
+                      <span className={`sb-admin-lite-status ${
+                        order.status === 'CONFIRMED' ? 'ok' :
+                        order.status === 'AWAITING_CONFIRMATION' ? 'info' :
+                        order.status === 'CANCELLED' || order.status === 'FAILED' ? 'warn' : 'info'
+                      }`}>{order.status}</span>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        {order.status === 'AWAITING_CONFIRMATION' && (
+                          <button
+                            type="button"
+                            onClick={() => confirmOrder(order.rawId)}
+                            style={{ padding: '5px 12px', borderRadius: '8px', border: 'none', background: '#16a34a', color: '#fff', fontSize: '12px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                          >
+                            ✅ Duyet don
+                          </button>
+                        )}
+                        {order.payment?.status === 'PENDING' && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => approvePayment(order.rawId, true)}
+                              style={{ padding: '5px 8px', borderRadius: '4px', border: 'none', background: '#3b82f6', color: '#fff', fontSize: '11px', cursor: 'pointer' }}
+                            >
+                              Duyet TT
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => approvePayment(order.rawId, false)}
+                              style={{ padding: '5px 8px', borderRadius: '4px', border: 'none', background: '#ef4444', color: '#fff', fontSize: '11px', cursor: 'pointer' }}
+                            >
+                              Huy TT
+                            </button>
+                          </>
+                        )}
+                        {order.shipment?.status === 'PENDING' && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => approveShipment(order.rawId, true)}
+                              style={{ padding: '5px 8px', borderRadius: '4px', border: 'none', background: '#8b5cf6', color: '#fff', fontSize: '11px', cursor: 'pointer' }}
+                            >
+                              Duyet VC
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => approveShipment(order.rawId, false)}
+                              style={{ padding: '5px 8px', borderRadius: '4px', border: 'none', background: '#ef4444', color: '#fff', fontSize: '11px', cursor: 'pointer' }}
+                            >
+                              Huy VC
+                            </button>
+                          </>
+                        )}
+                        {order.status !== 'AWAITING_CONFIRMATION' && (!order.payment || order.payment.status !== 'PENDING') && (!order.shipment || order.shipment.status !== 'PENDING') && (
+                          <span style={{ color: '#94a3b8', fontSize: '12px' }}>
+                            {order.status === 'CONFIRMED' ? 'Da xu ly' :
+                             order.status === 'CANCELLED' ? 'Da huy' :
+                             order.status === 'FAILED' ? 'That bai' : 'Dang xu ly...'}
+                          </span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )) : (
-                  <tr><td colSpan="5" style={{ textAlign: 'center', padding: '20px' }}>Khong co don hang nao.</td></tr>
+                  <tr><td colSpan="6" style={{ textAlign: 'center', padding: '20px' }}>Khong co don hang nao.</td></tr>
                 )}
               </tbody>
             </table>

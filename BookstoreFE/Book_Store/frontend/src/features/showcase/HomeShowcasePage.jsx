@@ -29,6 +29,7 @@ export default function HomeShowcasePage() {
   const [activeCategory, setActiveCategory] = useState('All Categories');
   const [searchText, setSearchText] = useState('');
   const [visibleBookCount, setVisibleBookCount] = useState(INITIAL_VISIBLE_BOOKS);
+  const [sortOrder, setSortOrder] = useState('popular');
   const [error, setError] = useState('');
 
   const { user, logout } = useAuth();
@@ -54,9 +55,9 @@ export default function HomeShowcasePage() {
     async function loadData() {
       try {
         const [bookData, recData, categoryData] = await Promise.all([
-          BooksApi.list(),
-          RecommendationsApi.list(),
-          CategoriesApi.list(),
+          BooksApi.list().catch((err) => { console.error(err); return []; }),
+          RecommendationsApi.list().catch((err) => { console.error(err); return []; }),
+          CategoriesApi.list().catch((err) => { console.error(err); return []; }),
         ]);
 
         setBooks(Array.isArray(bookData) ? bookData : []);
@@ -77,19 +78,23 @@ export default function HomeShowcasePage() {
 
   const filteredBooks = useMemo(() => {
     const term = searchText.trim().toLowerCase();
-    const source = recommendations.length ? recommendations : books;
+    const source = books;
 
-    return source.filter((book, idx) => {
+    let result = source.filter((book) => {
       const categoryPass =
-        activeCategory === 'All Categories' || categoryTabs[idx % categoryTabs.length] === activeCategory;
+        activeCategory === 'All Categories' ||
+        (book.categories || []).some((c) => c.name === activeCategory);
 
-      if (!term) {
-        return categoryPass;
-      }
-
+      if (!term) return categoryPass;
       return categoryPass && `${book.title} ${book.author}`.toLowerCase().includes(term);
     });
-  }, [activeCategory, books, categoryTabs, recommendations, searchText]);
+
+    if (sortOrder === 'price_asc') result = [...result].sort((a, b) => Number(a.price) - Number(b.price));
+    else if (sortOrder === 'price_desc') result = [...result].sort((a, b) => Number(b.price) - Number(a.price));
+    else if (sortOrder === 'alpha') result = [...result].sort((a, b) => a.title.localeCompare(b.title));
+
+    return result;
+  }, [activeCategory, books, recommendations, searchText, sortOrder]);
 
   useEffect(() => {
     setVisibleBookCount(INITIAL_VISIBLE_BOOKS);
@@ -134,7 +139,7 @@ export default function HomeShowcasePage() {
                 <circle cx="9" cy="20" r="1.6" />
                 <circle cx="18" cy="20" r="1.6" />
               </svg>
-              <span>{displayedBooks.length}</span>
+              <span>{filteredBooks.length}</span>
             </Link>
 
             {user ? (
@@ -201,7 +206,36 @@ export default function HomeShowcasePage() {
         <section className="sb-section" id="popular-books">
           <div className="sb-row">
             <h2>Popular Books</h2>
-            <button type="button" className="sb-filter-btn">Sort by: Popularity</button>
+            <div style={{ position: 'relative', display: 'inline-block' }}>
+              <select
+                value={sortOrder}
+                onChange={(e) => { setSortOrder(e.target.value); setVisibleBookCount(INITIAL_VISIBLE_BOOKS); }}
+                style={{
+                  appearance: 'none',
+                  WebkitAppearance: 'none',
+                  background: '#fff',
+                  border: '1.5px solid #c9d0e6',
+                  borderRadius: '999px',
+                  color: '#2c3558',
+                  padding: '8px 36px 8px 16px',
+                  fontWeight: '700',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  outline: 'none',
+                  boxShadow: '0 2px 8px rgba(14,24,54,0.06)',
+                  fontFamily: 'inherit',
+                }}
+              >
+                <option value="popular">⭐ Sort by: Popularity</option>
+                <option value="price_asc">💰 Sort by: Price ↑</option>
+                <option value="price_desc">💎 Sort by: Price ↓</option>
+                <option value="alpha">🔤 Sort by: Title A–Z</option>
+              </select>
+              <span style={{
+                position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+                pointerEvents: 'none', color: '#3b3fb4', fontSize: '12px',
+              }}>▼</span>
+            </div>
           </div>
 
           <div className="sb-book-grid">
@@ -224,7 +258,9 @@ export default function HomeShowcasePage() {
                       aria-label={`Go to cart from ${book.title}`}
                       onClick={(e) => handleCartClick(e, `/book/${book.id}`)}
                     >
-                      +
+                      <svg viewBox="0 0 24 24" width="15" height="15" stroke="#fff" fill="none" strokeWidth="3" strokeLinecap="round">
+                        <path d="M12 5v14M5 12h14"/>
+                      </svg>
                     </button>
                   </div>
                 </article>

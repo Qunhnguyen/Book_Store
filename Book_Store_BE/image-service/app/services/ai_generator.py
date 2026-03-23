@@ -38,7 +38,7 @@ class AIGeneratorService:
             'model': 'dall-e-3',
             'prompt': prompt,
             'n': 1,
-            'size': '512x512',
+            'size': '1024x1024',
             'response_format': 'url',
         }
         data = json_mod.dumps(payload).encode()
@@ -57,6 +57,9 @@ class AIGeneratorService:
             url = result['data'][0]['url']
             with urllib.request.urlopen(url, timeout=15) as img_resp:
                 return img_resp.read()
+        except urllib.error.HTTPError as exc:
+            logger.error('DALL-E call error: %s - %s', exc, exc.read().decode())
+            return None
         except Exception as exc:
             logger.error('DALL-E call error: %s', exc)
             return None
