@@ -100,6 +100,7 @@ export const ReviewsApi = {
   list: () => api.get('/api/reviews/'),
   create: (payload) => api.post('/api/reviews/', payload),
   listByBook: (bookId) => api.get(`/api/reviews/book/${bookId}/`),
+  reply: (id, text) => api.patch(`/api/reviews/${id}/`, { admin_reply: text }),
 };
 
 export const ManagersApi = {

@@ -369,6 +369,12 @@ export default function ProductDetailShowcasePage() {
                       <div className="sb-stars-line">★★★★★</div>
                     </div>
                     <p>“{item.comment || 'No comment provided.'}”</p>
+                    {item.admin_reply && (
+                      <div style={{ marginTop: '12px', padding: '12px', background: '#f8f9fd', borderRadius: '8px', borderLeft: '4px solid #4a4bcf' }}>
+                        <strong style={{ display: 'block', fontSize: '13px', color: '#4a4bcf', marginBottom: '4px' }}>Phan hoi tu BookStore:</strong>
+                        <p style={{ margin: 0, fontSize: '14px', color: '#454d64' }}>{item.admin_reply}</p>
+                      </div>
+                    )}
                   </div>
                 </article>
               ))}

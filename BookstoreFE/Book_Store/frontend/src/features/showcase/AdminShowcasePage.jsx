@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { BooksApi, OrdersApi, CustomersApi, ReviewsApi, CategoriesApi, getErrorMessage } from '../../api/client';
+import { BooksApi, OrdersApi, CustomersApi, ReviewsApi, CategoriesApi, PaymentsApi, ShipmentsApi, getErrorMessage } from '../../api/client';
 
 function toVnd(value) {
   return `${Math.round(Number(value || 0)).toLocaleString('vi-VN')}d`;
@@ -11,6 +11,8 @@ const menuItems = [
   { id: 'categories', label: 'Danh muc', icon: '◈' },
   { id: 'customers', label: 'Khach hang', icon: '◉' },
   { id: 'orders', label: 'Don hang', icon: '🛒' },
+  { id: 'payments', label: 'Thanh toan', icon: '💳' },
+  { id: 'shipments', label: 'Van chuyen', icon: '🚚' },
   { id: 'reviews', label: 'Danh gia', icon: '★' },
   { id: 'settings', label: 'Cai dat', icon: '⚙' },
 ];
@@ -43,6 +45,8 @@ export default function AdminShowcasePage() {
   const [orders, setOrders] = useState([]);
   const [categories, setCategories] = useState([]);
   const [reviews, setReviews] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [shipments, setShipments] = useState([]);
   const [customerPage, setCustomerPage] = useState(1);
   const [customerFilter, setCustomerFilter] = useState('all');
   const [books, setBooks] = useState([]);
@@ -53,6 +57,8 @@ export default function AdminShowcasePage() {
   const [editingBookId, setEditingBookId] = useState(null);
   const [bookForm, setBookForm] = useState(initialBookForm);
   const [bookError, setBookError] = useState('');
+  const [replyingReviewId, setReplyingReviewId] = useState(null);
+  const [replyText, setReplyText] = useState('');
 
   const dynamicOrders = useMemo(() => {
     return orders.map(order => ({
@@ -188,6 +194,9 @@ export default function AdminShowcasePage() {
         
         const paymentsList = Array.isArray(paymentsData) ? paymentsData : [];
         const shipmentsList = Array.isArray(shipmentsData) ? shipmentsData : [];
+        
+        setPayments(paymentsList);
+        setShipments(shipmentsList);
         
         const enrichedOrders = (Array.isArray(ordersData) ? ordersData : []).map(order => {
           const payment = paymentsList.find(p => p.order_id === order.id) || null;
@@ -373,6 +382,12 @@ export default function AdminShowcasePage() {
         }
         return o;
       }));
+      setPayments(current => current.map(p => {
+        if (p.order_id === orderId) {
+          return { ...p, status: isApproved ? 'PAID' : 'FAILED' };
+        }
+        return p;
+      }));
     } catch (err) {
       window.alert(`Loi khi duyet thanh toan: ${getErrorMessage(err)}`);
     }
@@ -388,9 +403,35 @@ export default function AdminShowcasePage() {
         }
         return o;
       }));
+      setShipments(current => current.map(s => {
+        if (s.order_id === orderId) {
+          return { ...s, status: isApproved ? 'RESERVED' : 'FAILED' };
+        }
+        return s;
+      }));
     } catch (err) {
       window.alert(`Loi khi duyet van chuyen: ${getErrorMessage(err)}`);
     }
+  }
+
+  async function submitReplyReview(reviewId) {
+    if (!replyText.trim()) {
+      window.alert("Vui long nhap noi dung phan hoi.");
+      return;
+    }
+    try {
+      await ReviewsApi.reply(reviewId, replyText);
+      setReviews(current => current.map(r => r.id === reviewId ? { ...r, admin_reply: replyText } : r));
+      setReplyingReviewId(null);
+      setReplyText('');
+    } catch (err) {
+      window.alert(`Loi khi phan hoi: ${getErrorMessage(err)}`);
+    }
+  }
+
+  function openReplyForm(reviewId, currentReply) {
+    setReplyingReviewId(reviewId);
+    setReplyText(currentReply || '');
   }
 
   function renderOrders() {
@@ -618,8 +659,35 @@ export default function AdminShowcasePage() {
                     <tr key={review.id}>
                       <td><strong>KH {review.customer_id}</strong></td>
                       <td><span style={{ color: '#fbbf24', fontSize: '16px' }}>{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</span></td>
-                      <td><p style={{ margin: 0, color: '#454d64', fontStyle: 'italic' }}>"{review.comment || 'Khong co binh luan.'}"</p></td>
-                      <td><button type="button" className="sb-admin-lite-danger" onClick={() => window.alert('Xoa binh luan...')}>Xoa</button></td>
+                      <td>
+                        <p style={{ margin: 0, color: '#454d64', fontStyle: 'italic' }}>"{review.comment || 'Khong co binh luan.'}"</p>
+                        {review.admin_reply && replyingReviewId !== review.id && (
+                          <div style={{ marginTop: '8px', padding: '8px', background: '#f8f9fd', borderLeft: '3px solid #3b82f6', fontSize: '13px' }}>
+                            <strong>Phan hoi tu Admin:</strong> {review.admin_reply}
+                          </div>
+                        )}
+                        {replyingReviewId === review.id && (
+                          <div style={{ marginTop: '8px', padding: '8px', background: '#f8f9fd', border: '1px solid #d0d4e8', borderRadius: '4px' }}>
+                            <textarea
+                              rows="3"
+                              value={replyText}
+                              onChange={(e) => setReplyText(e.target.value)}
+                              placeholder="Nhap phan hoi..."
+                              style={{ width: '100%', padding: '6px', fontSize: '12px', border: '1px solid #ccc', borderRadius: '4px', marginBottom: '8px', resize: 'vertical' }}
+                            />
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <button type="button" onClick={() => submitReplyReview(review.id)} style={{ padding: '4px 12px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' }}>Gửi</button>
+                              <button type="button" onClick={() => setReplyingReviewId(null)} style={{ padding: '4px 12px', background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' }}>Hủy</button>
+                            </div>
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
+                          <button type="button" className="sb-admin-lite-primary" onClick={() => openReplyForm(review.id, review.admin_reply)} style={{ padding: '4px 8px', fontSize: '11px' }}>{review.admin_reply ? 'Sua phan hoi' : 'Tra loi'}</button>
+                          <button type="button" className="sb-admin-lite-danger" onClick={() => window.alert('Xoa binh luan...')} style={{ padding: '4px 8px', fontSize: '11px' }}>Xoa</button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -632,6 +700,144 @@ export default function AdminShowcasePage() {
             <p>Khach hang be ngoan tu tu roi se binh luan.</p>
           </div>
         )}
+      </>
+    );
+  }
+
+  function renderPayments() {
+    return (
+      <>
+        <header className="sb-admin-lite-topbar sb-admin-lite-topbar-customers">
+          <div>
+            <h1>Quan ly Thanh toan</h1>
+            <p className="sb-admin-lite-subtitle">Theo doi giao dich thanh toan don hang</p>
+          </div>
+        </header>
+
+        <section className="sb-admin-lite-panel sb-admin-lite-customers-panel">
+          <div className="sb-admin-lite-table-wrap">
+            <table className="sb-admin-lite-table">
+              <thead>
+                <tr>
+                  <th>MA TT</th>
+                  <th>MA DON HANG</th>
+                  <th>PHUONG THUC</th>
+                  <th>NHA CUNG CAP</th>
+                  <th>TRANG THAI</th>
+                  <th>THAO TAC</th>
+                </tr>
+              </thead>
+              <tbody>
+                {payments.length > 0 ? payments.map((payment) => (
+                  <tr key={payment.id}>
+                    <td><strong>#{payment.id}</strong></td>
+                    <td>#{payment.order_id}</td>
+                    <td>{payment.method || 'Unknown'}</td>
+                    <td>{payment.provider || 'N/A'}</td>
+                    <td>
+                      <span className={`sb-admin-lite-status ${
+                        payment.status === 'PAID' ? 'ok' :
+                        payment.status === 'FAILED' ? 'warn' : 'info'
+                      }`}>{payment.status}</span>
+                    </td>
+                    <td>
+                      {payment.status === 'PENDING' ? (
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            type="button"
+                            onClick={() => approvePayment(payment.order_id, true)}
+                            style={{ padding: '5px 8px', borderRadius: '4px', border: 'none', background: '#3b82f6', color: '#fff', fontSize: '11px', cursor: 'pointer' }}
+                          >
+                            Duyet
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => approvePayment(payment.order_id, false)}
+                            style={{ padding: '5px 8px', borderRadius: '4px', border: 'none', background: '#ef4444', color: '#fff', fontSize: '11px', cursor: 'pointer' }}
+                          >
+                            Huy
+                          </button>
+                        </div>
+                      ) : (
+                        <span style={{ color: '#94a3b8', fontSize: '12px' }}>Da xu ly</span>
+                      )}
+                    </td>
+                  </tr>
+                )) : (
+                  <tr><td colSpan="6" style={{ textAlign: 'center', padding: '20px' }}>Chua co thanh toan nao.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </>
+    );
+  }
+
+  function renderShipments() {
+    return (
+      <>
+        <header className="sb-admin-lite-topbar sb-admin-lite-topbar-customers">
+          <div>
+            <h1>Quan ly Van chuyen</h1>
+            <p className="sb-admin-lite-subtitle">Theo doi don vi van chuyen</p>
+          </div>
+        </header>
+
+        <section className="sb-admin-lite-panel sb-admin-lite-customers-panel">
+          <div className="sb-admin-lite-table-wrap">
+            <table className="sb-admin-lite-table">
+              <thead>
+                <tr>
+                  <th>MA VC</th>
+                  <th>MA DON HANG</th>
+                  <th>DIA CHI GIAO</th>
+                  <th>TRANG THAI</th>
+                  <th>THAO TAC</th>
+                </tr>
+              </thead>
+              <tbody>
+                {shipments.length > 0 ? shipments.map((shipment) => (
+                  <tr key={shipment.id}>
+                    <td><strong>#{shipment.id}</strong></td>
+                    <td>#{shipment.order_id}</td>
+                    <td>{shipment.address || 'N/A'}</td>
+                    <td>
+                      <span className={`sb-admin-lite-status ${
+                        shipment.status === 'RESERVED' || shipment.status === 'DELIVERED' ? 'ok' :
+                        shipment.status === 'FAILED' ? 'warn' : 'info'
+                      }`}>{shipment.status}</span>
+                    </td>
+                    <td>
+                      {shipment.status === 'PENDING' ? (
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            type="button"
+                            onClick={() => approveShipment(shipment.order_id, true)}
+                            style={{ padding: '5px 8px', borderRadius: '4px', border: 'none', background: '#8b5cf6', color: '#fff', fontSize: '11px', cursor: 'pointer' }}
+                          >
+                            Duyet
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => approveShipment(shipment.order_id, false)}
+                            style={{ padding: '5px 8px', borderRadius: '4px', border: 'none', background: '#ef4444', color: '#fff', fontSize: '11px', cursor: 'pointer' }}
+                          >
+                            Huy
+                          </button>
+                        </div>
+                      ) : (
+                        <span style={{ color: '#94a3b8', fontSize: '12px' }}>Da xu ly</span>
+                      )}
+                    </td>
+                  </tr>
+                )) : (
+                  <tr><td colSpan="5" style={{ textAlign: 'center', padding: '20px' }}>Chua co don van chuyen nao.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
       </>
     );
   }
@@ -1047,6 +1253,8 @@ export default function AdminShowcasePage() {
           {activeMenu === 'books' ? renderBooks() : null}
           {activeMenu === 'customers' ? renderCustomers() : null}
           {activeMenu === 'orders' ? renderOrders() : null}
+          {activeMenu === 'payments' ? renderPayments() : null}
+          {activeMenu === 'shipments' ? renderShipments() : null}
           {activeMenu === 'categories' ? renderCategories() : null}
           {activeMenu === 'reviews' ? renderReviews() : null}
           {activeMenu === 'overview' ? renderOverview() : null}

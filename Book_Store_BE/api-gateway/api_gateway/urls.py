@@ -1,4 +1,4 @@
-﻿from django.contrib import admin
+from django.contrib import admin
 from django.urls import path
 
 from app.views import (
@@ -7,11 +7,11 @@ from app.views import (
     categories_api, category_detail_api, categories_ui, customer_orders_api, customers_api,
     customer_login_api, customer_register_api,
     customers_ui, health_check, home_ui, managers_api, managers_ui,
-    metrics_view, orders_api,
-    orders_ui, payments_api, payments_by_order_api, payments_ui,
-    recommendations_api, recommendations_ui, reviews_api,
+    metrics_view, orders_api, orders_confirm_api, order_status_api,
+    orders_ui, payments_api, payments_by_order_api, payments_approve_api, payments_ui,
+    recommendations_api, recommendations_ui, review_detail_api, reviews_api,
     reviews_by_book_api, reviews_ui, shipments_api,
-    shipments_by_order_api, shipments_ui, staff_book_detail_api,
+    shipments_by_order_api, shipments_approve_api, shipments_ui, staff_book_detail_api,
     staff_books_api, staff_delete_book_ui, staff_ui,
 )
 
@@ -37,11 +37,16 @@ urlpatterns = [
     path('api/cart-items/<int:item_id>/', cart_item_detail_api),
     path('api/orders/', orders_api),
     path('api/orders/<int:customer_id>/', customer_orders_api),
+    path('api/orders/<int:order_id>/confirm/', orders_confirm_api),
+    path('api/orders/<int:order_id>/status/', order_status_api),
     path('api/payments/', payments_api),
+    path('api/payments/<int:order_id>/approve/', payments_approve_api),
     path('api/payments/<int:order_id>/', payments_by_order_api),
     path('api/shipments/', shipments_api),
+    path('api/shipments/<int:order_id>/approve/', shipments_approve_api),
     path('api/shipments/<int:order_id>/', shipments_by_order_api),
     path('api/reviews/', reviews_api),
+    path('api/reviews/<int:pk>/', review_detail_api),
     path('api/reviews/book/<int:book_id>/', reviews_by_book_api),
     path('api/managers/', managers_api),
     path('api/staff/books/', staff_books_api),

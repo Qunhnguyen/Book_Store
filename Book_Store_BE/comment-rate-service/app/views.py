@@ -45,3 +45,19 @@ class ReviewByBook(APIView):
         reviews = Review.objects.filter(book_id=book_id).order_by("id")
         serializer = ReviewSerializer(reviews, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+class ReviewDetail(APIView):
+    def patch(self, request, pk):
+        try:
+            review = Review.objects.get(pk=pk)
+        except Review.DoesNotExist:
+            return Response({"error": "Review not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Only allow updating admin_reply
+        if "admin_reply" in request.data:
+            review.admin_reply = request.data["admin_reply"]
+            review.save()
+            serializer = ReviewSerializer(review)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        
+        return Response({"error": "admin_reply field is required"}, status=status.HTTP_400_BAD_REQUEST)

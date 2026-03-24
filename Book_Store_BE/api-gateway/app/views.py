@@ -200,6 +200,16 @@ def payments_approve_api(request, order_id):
 
 
 @csrf_exempt
+def orders_confirm_api(request, order_id):
+    return _forward_request(request, ORDER_SERVICE_URL, f'/orders/{order_id}/confirm/')
+
+
+@csrf_exempt
+def order_status_api(request, order_id):
+    return _forward_request(request, ORDER_SERVICE_URL, f'/orders/{order_id}/status/')
+
+
+@csrf_exempt
 def shipments_api(request):
     return _forward_request(request, SHIP_SERVICE_URL, '/shipments/')
 
@@ -211,6 +221,11 @@ def shipments_by_order_api(request, order_id):
 @csrf_exempt
 def shipments_approve_api(request, order_id):
     return _forward_request(request, SHIP_SERVICE_URL, f'/shipments/{order_id}/approve/')
+
+
+@csrf_exempt
+def review_detail_api(request, pk):
+    return _forward_request(request, COMMENT_RATE_SERVICE_URL, f'/reviews/{pk}/')
 
 
 @csrf_exempt

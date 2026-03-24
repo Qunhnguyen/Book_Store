@@ -6,3 +6,4 @@ class Review(models.Model):
     book_id = models.IntegerField()
     rating = models.IntegerField()
     comment = models.TextField(blank=True, default="")
+    admin_reply = models.TextField(blank=True, default="")
