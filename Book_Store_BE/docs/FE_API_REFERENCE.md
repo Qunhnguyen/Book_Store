@@ -1,42 +1,20 @@
-﻿# FE API Reference
+# FE API Reference
 
-## Overview
-Tai lieu nay mo ta API ma frontend nen su dung de tich hop voi he thong hien tai.
+This document provides the standard API specifications for the frontend to integrate with the Book Store Backend.
+All API endpoints go through the **API Gateway**, typically running on `http://localhost:8000`.
 
-- Base URL: `http://localhost:8000`
-- FE chi nen goi qua API Gateway, khong goi truc tiep tung service noi bo
+- FE chỉ nên gọi qua API Gateway, không gọi trực tiếp từng service nội bộ.
 - Prefix chung: `/api/...`
 - Content type: `application/json`
 
-Gateway route hien tai nam o:
-- `api-gateway/api_gateway/urls.py`
-- `api-gateway/app/views.py`
+---
 
-## Auth
-Backend dang dung JWT tai gateway.
+## 🔐 Auth & Security
+- **Authentication**: JWT (JSON Web Token)
+- **Header format**: `Authorization: Bearer <token>`
+- Endpoints marked với 🔒 require authentication.
 
-### Public endpoints
-Cac endpoint sau khong can token:
-- `POST /api/login/`
-- `POST /api/register/`
-- `GET /api/books/`
-- `GET /api/books/{book_id}/`
-- `GET /api/categories/`
-- `GET /api/categories/{category_id}/`
-- `GET /api/reviews/book/{book_id}/`
-- `GET /api/recommendations/`
-- `GET /api/health/`
-- `GET /api/metrics/`
-
-### Protected endpoints
-Nhung endpoint con lai can header:
-
-```http
-Authorization: Bearer <token>
-```
-
-Neu thieu token, gateway tra:
-
+Nếu thiếu token (trên protected endpoints), gateway trả về:
 ```json
 {
   "error": "Unauthorized: Bearer token is required"
@@ -44,595 +22,258 @@ Neu thieu token, gateway tra:
 ```
 
 ## Common Error Shape
-System chua co mot schema loi duy nhat, nhung FE co the ky vong cac dang sau:
+Hệ thống chưa có một schema lỗi duy nhất, nhưng FE có thể kỳ vọng các dạng sau:
 
 ```json
 {
   "error": "Human-readable message"
 }
 ```
-
-Hoac loi validation DRF:
-
+Hoặc lỗi validation DRF:
 ```json
 {
   "field_name": ["Error message"]
 }
 ```
 
-Ma loi thuong gap:
-- `400`: input sai hoac business validation fail
-- `401`: thieu token / token het han / token sai
-- `404`: resource khong ton tai
-- `409`: xung dot business, vi du xoa book khi inventory dang co reservation
-- `503`: service downstream tam thoi khong reachable
+Mã lỗi thường gặp:
+- `400`: input sai hoặc business validation fail
+- `401`: thiếu token / token hết hạn / token sai
+- `404`: resource không tồn tại
+- `409`: xung đột business, ví dụ xóa book khi inventory đang có reservation
+- `503`: service downstream tạm thời không reachable
 
-## Data Models FE Nen Dung
-
-### Book
-```json
-{
-  "id": 1,
-  "title": "Clean Architecture",
-  "author": "Robert C. Martin",
-  "price": "19.99",
-  "stock": 4,
-  "isbn": "9780134494166",
-  "official_cover_url": null,
-  "ai_image_url": null,
-  "image_source": "PLACEHOLDER",
-  "image_status": "NONE",
-  "image_prompt": null,
-  "image_generated_at": null,
-  "image_last_checked_at": null,
-  "display_image_url": "/static/placeholder-cover.png",
-  "categories": [
-    { "id": 1, "name": "Backend" },
-    { "id": 2, "name": "Architecture" }
-  ]
-}
-```
-
-### Category
-```json
-{
-  "id": 1,
-  "name": "Backend"
-}
-```
-
-### Customer
-```json
-{
-  "id": 1,
-  "name": "Nguyen Van A",
-  "email": "a@example.com"
-}
-```
-
-### Login Response
-```json
-{
-  "message": "Login successful",
-  "token": "<jwt>",
-  "customer_id": 1,
-  "name": "Nguyen Van A",
-  "email": "a@example.com"
-}
-```
-
-### Cart
-```json
-{
-  "id": 1,
-  "customer_id": 1
-}
-```
-
-### Cart Item
-```json
-{
-  "id": 1,
-  "cart": 1,
-  "book_id": 2,
-  "quantity": 3
-}
-```
-
-### Order
-```json
-{
-  "id": 1,
-  "customer_id": 1,
-  "status": "PENDING",
-  "total_price": "39.98",
-  "saga_id": "uuid-like-string",
-  "correlation_id": "uuid-like-string"
-}
-```
-
-### Payment
-```json
-{
-  "id": 1,
-  "order_id": 1,
-  "payment_method": "COD",
-  "status": "PAID"
-}
-```
-
-### Shipment
-```json
-{
-  "id": 1,
-  "order_id": 1,
-  "shipping_method": "STANDARD",
-  "address": "123 Nguyen Trai",
-  "status": "RESERVED"
-}
-```
-
-### Review
-```json
-{
-  "id": 1,
-  "customer_id": 1,
-  "book_id": 2,
-  "rating": 5,
-  "comment": "Sach rat hay"
-}
-```
+---
 
 ## API Reference
 
-### 1. Auth
+### 1. Authentication & Users
 
-#### `POST /api/register/`
-Tao customer moi.
-
-Request:
-```json
-{
-  "name": "Nguyen Van A",
-  "email": "a@example.com",
-  "password": "secret123"
-}
-```
-
-Success `201`:
-```json
-{
-  "id": 1,
-  "name": "Nguyen Van A",
-  "email": "a@example.com"
-}
-```
-
-Notes:
-- Password khong tra ve trong response
-- Sau khi register, customer-service se tu goi sang cart-service de tao mot cart mac dinh
-- Neu cart-service loi, register co the bi rollback va tra `503`
-
-#### `POST /api/login/`
-Dang nhap va nhan JWT.
-
-Request:
-```json
-{
-  "email": "a@example.com",
-  "password": "secret123"
-}
-```
-
-Success `200`:
-```json
-{
-  "message": "Login successful",
-  "token": "<jwt>",
-  "customer_id": 1,
-  "name": "Nguyen Van A",
-  "email": "a@example.com"
-}
-```
-
-### 2. Books
-
-#### `GET /api/books/`
-Lay danh sach sach.
-
-Success `200`:
-```json
-[
+#### 1.1 Customer Registration
+- **URL:** `/api/register/`
+- **Method:** `POST`
+- **Authentication:** None
+- **Request Body:**
+  ```json
   {
-    "id": 1,
-    "title": "Clean Code",
-    "author": "Robert C. Martin",
-    "price": "19.99",
-    "stock": 4,
-    "isbn": null,
-    "official_cover_url": null,
-    "ai_image_url": null,
-    "image_source": "PLACEHOLDER",
-    "image_status": "NONE",
-    "image_prompt": null,
-    "image_generated_at": null,
-    "image_last_checked_at": null,
-    "display_image_url": "/static/placeholder-cover.png",
-    "categories": []
+    "name": "Nguyen Van A",
+    "email": "a@example.com",
+    "password": "securepassword123"
   }
-]
-```
-
-#### `GET /api/books/{book_id}/`
-Lay chi tiet sach.
-
-#### `POST /api/books/`
-Tao sach moi.
-
-Request:
-```json
-{
-  "title": "Domain-Driven Design",
-  "author": "Eric Evans",
-  "price": "29.99",
-  "stock": 10,
-  "isbn": "9780321125217",
-  "category_ids": [1, 2]
-}
-```
-
-Notes:
-- `category_ids` la optional
-- `stock` se duoc sync qua inventory-service
-- Response tra `categories` da duoc resolve thanh object
-
-#### `PUT /api/books/{book_id}/`
-Cap nhat sach.
-
-Request co the la partial theo implementation hien tai:
-```json
-{
-  "stock": 7,
-  "category_ids": [2, 3]
-}
-```
-
-#### Response fields can read-only
-- `official_cover_url`
-- `ai_image_url`
-- `image_source`
-- `image_status`
-- `image_prompt`
-- `image_generated_at`
-- `image_last_checked_at`
-- `display_image_url`
-- `categories`
-
-### 3. Categories
-
-#### `GET /api/categories/`
-Lay danh sach category.
-
-Success `200`:
-```json
-[
-  { "id": 1, "name": "Backend" },
-  { "id": 2, "name": "Architecture" }
-]
-```
-
-#### `GET /api/categories/{category_id}/`
-Lay chi tiet 1 category.
-
-#### `POST /api/categories/`
-Tao category moi.
-
-Request:
-```json
-{
-  "name": "Microservices"
-}
-```
-
-### 4. Customers
-
-#### `GET /api/customers/`
-Lay danh sach customer.
-
-Notes:
-- Endpoint nay can JWT
-- Khong nen dung cho public UI trinh bay thong thuong, chu yeu phuc vu admin/internal
-
-### 5. Carts
-
-#### `POST /api/carts/`
-Tao cart thu cong.
-
-Request:
-```json
-{
-  "customer_id": 1
-}
-```
-
-Success `201`:
-```json
-{
-  "id": 1,
-  "customer_id": 1
-}
-```
-
-#### `GET /api/carts/{customer_id}/`
-Lay danh sach cart item theo customer.
-
-Success `200`:
-```json
-[
+  ```
+- **Response (201 Created):**
+  ```json
   {
     "id": 1,
-    "cart": 1,
-    "book_id": 2,
-    "quantity": 3
+    "name": "Nguyen Van A",
+    "email": "a@example.com"
   }
-]
-```
+  ```
+  *(Note: Password không được trả về trong response. Một cart mặc định sẽ tự động được tạo cho user qua cart-service)*
 
-#### `DELETE /api/carts/{customer_id}/`
-Xoa toan bo item trong cart cua customer.
-
-Response status: `204`
-
-#### `POST /api/cart-items/`
-Them item vao cart.
-
-Request:
-```json
-{
-  "cart": 1,
-  "book_id": 2,
-  "quantity": 3
-}
-```
-
-Success `201`:
-```json
-{
-  "id": 1,
-  "cart": 1,
-  "book_id": 2,
-  "quantity": 3
-}
-```
-
-#### `PUT /api/cart-items/{item_id}/`
-Cap nhat so luong.
-
-Request:
-```json
-{
-  "quantity": 5
-}
-```
-
-#### `DELETE /api/cart-items/{item_id}/`
-Xoa 1 item khoi cart.
-
-Response status: `204`
-
-### 6. Orders
-
-#### `POST /api/orders/`
-Tao order tu cart cua customer va kick off Saga.
-
-Request:
-```json
-{
-  "customer_id": 1
-}
-```
-
-Test-only flags van ton tai trong backend:
-```json
-{
-  "customer_id": 1,
-  "force_payment_failure": true,
-  "force_shipping_failure": true
-}
-```
-
-Success `201`:
-```json
-{
-  "id": 1,
-  "customer_id": 1,
-  "status": "PENDING",
-  "total_price": "39.98",
-  "saga_id": "...",
-  "correlation_id": "..."
-}
-```
-
-Important behavior:
-- Neu cart rong, tra `400`
-- Neu sach trong cart khong con ton tai hoac khong lay duoc pricing, order se khong duoc tao
-- Cart chi bi clear sau khi Saga chot `CONFIRMED`
-- Neu payment fail, order co the ve `CANCELLED` va cart van duoc giu
-
-#### `GET /api/orders/{customer_id}/`
-Lay danh sach order cua customer.
-
-#### `GET /api/orders/`
-Lay tat ca order.
-
-### 7. Payments
-
-#### `GET /api/payments/{order_id}/`
-Lay payment theo order.
-
-Success `200`:
-```json
-[
+#### 1.2 Customer Login
+- **URL:** `/api/login/`
+- **Method:** `POST`
+- **Authentication:** None
+- **Request Body:**
+  ```json
   {
-    "id": 1,
-    "order_id": 1,
-    "payment_method": "COD",
-    "status": "PAID"
+    "email": "a@example.com",
+    "password": "securepassword123"
   }
-]
-```
-
-#### `GET /api/payments/`
-Lay tat ca payment.
-
-#### `POST /api/payments/`
-Tao payment thu cong.
-
-Request:
-```json
-{
-  "order_id": 1,
-  "payment_method": "COD"
-}
-```
-
-Notes:
-- Trong flow binh thuong cua he thong, FE khong can goi endpoint nay vi payment duoc tao boi Saga
-- Endpoint nay huu ich cho admin/internal hoac test
-
-### 8. Shipments
-
-#### `GET /api/shipments/{order_id}/`
-Lay shipment theo order.
-
-Success `200`:
-```json
-[
+  ```
+- **Response (200 OK):**
+  ```json
   {
-    "id": 1,
-    "order_id": 1,
-    "shipping_method": "STANDARD",
-    "address": "",
-    "status": "RESERVED"
-  }
-]
-```
-
-#### `GET /api/shipments/`
-Lay tat ca shipment.
-
-#### `POST /api/shipments/`
-Tao shipment thu cong.
-
-Request:
-```json
-{
-  "order_id": 1,
-  "shipping_method": "STANDARD",
-  "address": "123 Nguyen Trai"
-}
-```
-
-Notes:
-- Trong flow binh thuong, FE khong can goi endpoint nay vi shipment duoc tao boi Saga
-
-### 9. Reviews
-
-#### `GET /api/reviews/book/{book_id}/`
-Lay review theo book.
-
-Success `200`:
-```json
-[
-  {
-    "id": 1,
+    "message": "Login successful",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVC...",
     "customer_id": 1,
-    "book_id": 2,
-    "rating": 5,
-    "comment": "Sach rat hay"
+    "name": "Nguyen Van A",
+    "email": "a@example.com"
   }
-]
-```
+  ```
 
-#### `POST /api/reviews/`
-Tao review moi.
+#### 1.3 Get All Customers 🔒
+- **URL:** `/api/customers/`
+- **Method:** `GET`
+- **Response (200 OK):** Array of customer objects.
+*(Note: Endpoint này chủ yếu phục vụ admin/internal, không dùng cho public UI)*
 
-Request:
-```json
-{
-  "customer_id": 1,
-  "book_id": 2,
-  "rating": 5,
-  "comment": "Sach rat hay"
-}
-```
+---
 
-Validation:
-- `rating` phai nam trong `[1..5]`
-- `book_id` phai ton tai
+### 2. Product Catalog (Books & Categories)
 
-#### `GET /api/reviews/`
-Lay tat ca review.
+#### 2.1 Get All Books
+- **URL:** `/api/books/`
+- **Method:** `GET`
+- **Response (200 OK):**
+  ```json
+  [
+    {
+      "id": 1,
+      "title": "Clean Code",
+      "author": "Robert C. Martin",
+      "price": "29.99",
+      "stock": 15,
+      "isbn": "9780132350884",
+      "official_cover_url": null,
+      "ai_image_url": null,
+      "image_source": "PLACEHOLDER",
+      "image_status": "NONE",
+      "display_image_url": "/static/placeholder-cover.png",
+      "categories": [
+        {"id": 1, "name": "Programming"}
+      ]
+    }
+  ]
+  ```
 
-### 10. Managers
+#### 2.2 Get Book Details
+- **URL:** `/api/books/<book_id>/`
+- **Method:** `GET`
 
-#### `GET /api/managers/`
-Lay danh sach manager.
+#### 2.3 Get Categories
+- **URL:** `/api/categories/`
+- **Method:** `GET`
 
-#### `POST /api/managers/`
-Tao manager.
+#### 2.4 Get Category Details
+- **URL:** `/api/categories/<category_id>/`
+- **Method:** `GET`
 
-Request:
-```json
-{
-  "name": "Manager 1",
-  "email": "manager1@example.com"
-}
-```
+#### 2.5 Get Personalized Recommendations
+- **URL:** `/api/recommendations/`
+- **Method:** `GET`
+- **Response (200 OK):** Trả về tối đa 5 sách còn quyển, theo định dạng một array.
 
-### 11. Staff Books
-Day la alias admin/staff proxy sang book-service.
+---
 
-#### `GET /api/staff/books/`
-#### `POST /api/staff/books/`
-#### `PUT /api/staff/books/{book_id}/`
-#### `DELETE /api/staff/books/{book_id}/`
+### 3. Cart Management
 
-Payload va response giong `Books API`.
+#### 3.1 Get Cart Items by Customer 🔒
+- **URL:** `/api/carts/<customer_id>/`
+- **Method:** `GET`
+- **Response (200 OK):**
+  ```json
+  [
+    {
+      "id": 1,
+      "cart": 1,
+      "book_id": 2,
+      "quantity": 3
+    }
+  ]
+  ```
 
-### 12. Recommendations
-
-#### `GET /api/recommendations/`
-Tra ve toi da 5 sach con hang.
-
-Success `200`:
-```json
-[
+#### 3.2 Add Item to Cart 🔒
+- **URL:** `/api/cart-items/`
+- **Method:** `POST`
+- **Request Body:**
+  ```json
   {
-    "id": 1,
-    "title": "Clean Code",
-    "author": "Robert C. Martin",
-    "price": "19.99",
-    "stock": 4,
-    "isbn": null,
-    "official_cover_url": null,
-    "ai_image_url": null,
-    "image_source": "PLACEHOLDER",
-    "image_status": "NONE",
-    "image_prompt": null,
-    "image_generated_at": null,
-    "image_last_checked_at": null,
-    "display_image_url": "/static/placeholder-cover.png",
-    "categories": []
+    "cart": 1, 
+    "book_id": 1,
+    "quantity": 2
   }
-]
-```
+  ```
 
-## Status Values FE Nen Biet
+#### 3.3 Remove/Update Cart Item 🔒
+- **URL:** `/api/cart-items/<item_id>/`
+- **Methods:** `PUT` (Update số lượng), `DELETE` (Remove item ra khỏi cart)
+
+---
+
+### 4. Ordering & Checkout (Saga Pattern)
+
+#### 4.1 Create Order (Checkout) 🔒
+- **URL:** `/api/orders/`
+- **Method:** `POST`
+- **Desc:** Triggers the Saga orchestrator. Lấy thông tin cart của user, tính tổng giá, clear cart, và tạo một Order có status là `PENDING`.
+- **Request Body:**
+  ```json
+  {
+    "customer_id": 1
+  }
+  ```
+- **Response (201 Created):**
+  ```json
+  {
+    "id": 101,
+    "customer_id": 1,
+    "status": "PENDING",
+    "total_price": "59.98",
+    "saga_id": "uuid-...",
+    "correlation_id": "uuid-..."
+  }
+  ```
+*(Note: Nếu cart rỗng thì sẽ trả về status 400. Cart chỉ bị xoá item sau khi Saga chốt `CONFIRMED`)*
+
+#### 4.2 Get Orders by Customer 🔒
+- **URL:** `/api/orders/<customer_id>/`
+- **Method:** `GET`
+- **Desc:** Dùng phương thức HTTP GET này để cập nhật (poll) status của Order (ví dụ: `PENDING` -> `PAYMENT_RESERVED` -> `CONFIRMED` hoặc là bị `CANCELLED` vì lỗi tồn kho hoặc thanh toán).
+
+---
+
+### 5. Payments & Shipping
+
+#### 5.1 Determine Payment Status 🔒
+- **URL:** `/api/payments/<order_id>/`
+- **Method:** `GET`
+- **Response (200 OK):** Array cung cấp chi tiết toàn bộ status thanh toán của Order đó.
+
+#### 5.2 Determine Shipping Status 🔒
+- **URL:** `/api/shipments/<order_id>/`
+- **Method:** `GET`
+- **Response (200 OK):** Array chi tiết về hành trình Giao Hàng của Order.
+
+> **Note**: Frontend Flow chuẩn sẽ không chủ động POST các lệnh yêu cầu payment hoặc shipment mới, vì luồng thanh toán và giao dịch sẽ do Microservice xử lý qua mô hình Event Driven (Saga).
+
+---
+
+### 6. Feedback & Reviews
+
+#### 6.1 Get Reviews for a Book
+- **URL:** `/api/reviews/book/<book_id>/`
+- **Method:** `GET`
+- **Response (200 OK):**
+  ```json
+  [
+    {
+      "id": 1,
+      "customer_id": 1,
+      "book_id": 1,
+      "rating": 5,
+      "comment": "Sach rat hay!"
+    }
+  ]
+  ```
+
+#### 6.2 Submit a Review 🔒
+- **URL:** `/api/reviews/`
+- **Method:** `POST`
+- **Request Body:**
+  ```json
+  {
+    "customer_id": 1,
+    "book_id": 1,
+    "rating": 5,
+    "comment": "Tuyệt vời vãi chưởng"
+  }
+  ```
+
+---
+
+### 7. Observability & Health
+
+- `GET /api/health/` - Liveness probe, không bắt buộc truyền thư mục Auth Headers
+- `GET /api/metrics/` - Prometheus metrics, trả về metrics không thuộc dạng JSON
+
+---
+
+## Status Values FE Nên Biết
 
 ### Order status
-Gia tri da thay trong code:
-- `PENDING`
+- `CREATED`, `PENDING`
 - `INVENTORY_RESERVED`
 - `PAYMENT_RESERVED`
 - `COMPENSATING`
@@ -641,14 +282,12 @@ Gia tri da thay trong code:
 - `FAILED`
 
 ### Payment status
-Gia tri da thay trong code/consumer:
 - `PENDING`
 - `PAID`
 - `FAILED`
 - `REFUNDED`
 
 ### Shipment status
-Gia tri da thay trong code/consumer:
 - `PENDING`
 - `RESERVED`
 - `FAILED`
@@ -666,24 +305,27 @@ Gia tri da thay trong code/consumer:
 - `AI`
 - `PLACEHOLDER`
 
+---
+
 ## Recommended FE Flow
-1. `POST /api/register/` hoac `POST /api/login/`
-2. Luu `token` va `customer_id`
-3. Load `GET /api/books/` va `GET /api/categories/`
-4. Chon sach va quan ly cart
-5. `POST /api/orders/` de checkout
-6. Poll `GET /api/orders/{customer_id}/` de theo doi status order
-7. Khi can, load `GET /api/payments/{order_id}/` va `GET /api/shipments/{order_id}/`
-8. Sau mua hang, goi `POST /api/reviews/`
+1. `POST /api/register/` hoặc `POST /api/login/`
+2. Lưu `token` và `customer_id` vào state module (React Redux/Context) hoặc localStorage.
+3. Call `GET /api/books/` (trang chủ) và `GET /api/categories/`
+4. Chọn sách và thêm sách đó vào cart item (Bằng Endpoint `POST /api/cart-items/`)
+5. Click thanh toán để gọi `POST /api/orders/` 
+6. Đặt lệnh Poll `GET /api/orders/{customer_id}/` khoảng một giây 1 lần ở màn Checkout để đón chờ thay đổi của Saga tự cập nhật.
+7. Khi có báo lỗi hoặc confirm, get API `GET /api/payments/{order_id}/` / `GET /api/shipments/{order_id}/` (tuỳ logic UI)
+8. Khi KH đọc xong cuốn sách, họ sẽ dùng `POST /api/reviews/` để gửi nhận xét.
+
+---
 
 ## Known Gaps / Caveats
-- `POST /api/cart-items/` can `cart_id`, nhung system hien tai khong co endpoint rieng de lay `cart` object theo `customer_id`; `GET /api/carts/{customer_id}/` chi tra cart items.
-- `register` tu tao mot cart mac dinh, nhung response register khong tra `cart_id`.
-- Vi gap tren, FE se can co workaround tam thoi neu muon add cart-item chuan: hoac cache `cart_id` tu luc tu tao cart bang `POST /api/carts/`, hoac backend can bo sung them endpoint tra cart theo customer.
-- `POST /api/payments/` va `POST /api/shipments/` ton tai, nhung trong user flow binh thuong frontend khong nen goi truc tiep vi he thong da chay Saga.
-- Gateway dang dung prefix public path, nen `GET /api/books/{id}/` va `GET /api/categories/{id}/` hien tai cung la public.
+- `POST /api/cart-items/` cần có `cart` (mã ID đại diện cho record gốc thuộc về Customer), nhưng BE hiện chưa có API riêng nào để trả object Cart trống (DUY NHẤT có `/api/carts/<customer_id>/` thường nó cũng chỉ trả item). FE nên chú ý có thể phải workaround tạm thời để có biến ID cart truyền vào (VD POST `/carts/` 1 lần cho chắc ăn).
+- Các API update sách trong nội dung app (`/api/staff/books/`) bị uỷ quyền sang `book-service`, yêu cầu Authentication (chỉ role manager/staff).
 
-## FE Typescript Suggestion
+---
+
+## FE Typescript Suggestion Dành cho Dev
 ```ts
 export type Category = {
   id: number;
@@ -716,11 +358,6 @@ export type LoginResponse = {
   email: string;
 };
 
-export type Cart = {
-  id: number;
-  customer_id: number;
-};
-
 export type CartItem = {
   id: number;
   cart: number;
@@ -731,7 +368,7 @@ export type CartItem = {
 export type Order = {
   id: number;
   customer_id: number;
-  status: 'PENDING' | 'INVENTORY_RESERVED' | 'PAYMENT_RESERVED' | 'COMPENSATING' | 'CONFIRMED' | 'CANCELLED' | 'FAILED';
+  status: 'CREATED' | 'PENDING' | 'INVENTORY_RESERVED' | 'PAYMENT_RESERVED' | 'COMPENSATING' | 'CONFIRMED' | 'CANCELLED' | 'FAILED';
   total_price: string;
   saga_id: string;
   correlation_id: string;
