@@ -1,3 +1,4 @@
+import os
 import requests
 from django.http import HttpResponse, JsonResponse
 from rest_framework import status
@@ -7,7 +8,7 @@ from rest_framework.views import APIView
 from .models import Payment
 from .serializers import PaymentSerializer
 
-ORDER_SERVICE_URL = "http://order-service:8000"
+ORDER_SERVICE_URL = os.environ.get("ORDER_SERVICE_URL", "http://order-service:8000")
 
 
 class PaymentListCreate(APIView):

@@ -1,3 +1,4 @@
+import os
 import requests
 from django.shortcuts import get_object_or_404
 from rest_framework import status
@@ -7,7 +8,7 @@ from rest_framework.views import APIView
 from .models import Cart, CartItem
 from .serializers import CartItemSerializer, CartSerializer
 
-BOOK_SERVICE_URL = "http://book-service:8000"
+BOOK_SERVICE_URL = os.environ.get("BOOK_SERVICE_URL", "http://book-service:8000")
 
 
 class CartCreate(APIView):

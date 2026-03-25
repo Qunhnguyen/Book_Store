@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 from .models import Customer
 from .serializers import CustomerSerializer
 
-CART_SERVICE_URL = "http://cart-service:8000"
+CART_SERVICE_URL = os.environ.get("CART_SERVICE_URL", "http://cart-service:8000")
 
 
 class CustomerLogin(APIView):

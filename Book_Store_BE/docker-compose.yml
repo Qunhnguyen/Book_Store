@@ -1,70 +1,81 @@
-version: "3.9"
+version: '3.9'
 
 services:
   customer-service:
     build: ./customer-service
     ports:
-      - "8001:8000"
+      - '8001:8000'
     environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
       - DB_NAME=customer_db
-      - DB_USER=customer_db
-      - DB_PASSWORD=customer_db
-      - JWT_SECRET=super-secret-key-for-bookstore
+      - DB_USER=${DB_USER:-customer_db}
+      - DB_PASSWORD=${DB_PASSWORD:-customer_db}
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-change-me-in-production}
+      - DEBUG=${DEBUG:-True}
     depends_on:
       - postgres
 
   book-service:
     build: ./book-service
     ports:
-      - "8002:8000"
+      - '8002:8000'
     environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
       - DB_NAME=book_db
-      - DB_USER=book_db
-      - DB_PASSWORD=book_db
+      - DB_USER=${DB_USER:-book_db}
+      - DB_PASSWORD=${DB_PASSWORD:-book_db}
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-change-me-in-production}
+      - DEBUG=${DEBUG:-True}
     depends_on:
       - postgres
 
   cart-service:
     build: ./cart-service
     ports:
-      - "8003:8000"
+      - '8003:8000'
     environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
       - DB_NAME=cart_db
-      - DB_USER=cart_db
-      - DB_PASSWORD=cart_db
+      - DB_USER=${DB_USER:-cart_db}
+      - DB_PASSWORD=${DB_PASSWORD:-cart_db}
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-change-me-in-production}
+      - DEBUG=${DEBUG:-True}
+      - BOOK_SERVICE_URL=${BOOK_SERVICE_URL:-http://book-service:8000}
     depends_on:
       - postgres
 
   staff-service:
     build: ./staff-service
     ports:
-      - "8004:8000"
+      - '8004:8000'
     environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
       - DB_NAME=staff_db
-      - DB_USER=staff_db
-      - DB_PASSWORD=staff_db
+      - DB_USER=${DB_USER:-staff_db}
+      - DB_PASSWORD=${DB_PASSWORD:-staff_db}
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-change-me-in-production}
+      - DEBUG=${DEBUG:-True}
+      - BOOK_SERVICE_URL=${BOOK_SERVICE_URL:-http://book-service:8000}
     depends_on:
       - postgres
 
   order-service:
     build: ./order-service
     ports:
-      - "8005:8000"
+      - '8005:8000'
     environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
       - DB_NAME=order_db
-      - DB_USER=order_db
-      - DB_PASSWORD=order_db
-      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - DB_USER=${DB_USER:-order_db}
+      - DB_PASSWORD=${DB_PASSWORD:-order_db}
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-change-me-in-production}
+      - DEBUG=${DEBUG:-True}
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
     depends_on:
       - postgres
       - rabbitmq
@@ -72,14 +83,23 @@ services:
   order-consumer:
     build: ./order-service
     restart: always
-    command: ["/wait-for-postgres.sh", "postgres", "python", "manage.py", "run_consumer"]
+    command:
+      [
+        '/wait-for-postgres.sh',
+        'postgres',
+        'python',
+        'manage.py',
+        'run_consumer'
+      ]
     environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
       - DB_NAME=order_db
-      - DB_USER=order_db
-      - DB_PASSWORD=order_db
-      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - DB_USER=${DB_USER:-order_db}
+      - DB_PASSWORD=${DB_PASSWORD:-order_db}
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-change-me-in-production}
+      - DEBUG=${DEBUG:-True}
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
     depends_on:
       - postgres
       - rabbitmq
@@ -87,14 +107,17 @@ services:
   pay-service:
     build: ./pay-service
     ports:
-      - "8006:8000"
+      - '8006:8000'
     environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
       - DB_NAME=pay_db
-      - DB_USER=pay_db
-      - DB_PASSWORD=pay_db
-      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - DB_USER=${DB_USER:-pay_db}
+      - DB_PASSWORD=${DB_PASSWORD:-pay_db}
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-change-me-in-production}
+      - DEBUG=${DEBUG:-True}
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+      - ORDER_SERVICE_URL=${ORDER_SERVICE_URL:-http://order-service:8000}
     depends_on:
       - postgres
       - rabbitmq
@@ -102,14 +125,23 @@ services:
   pay-consumer:
     build: ./pay-service
     restart: always
-    command: ["/wait-for-postgres.sh", "postgres", "python", "manage.py", "run_consumer"]
+    command:
+      [
+        '/wait-for-postgres.sh',
+        'postgres',
+        'python',
+        'manage.py',
+        'run_consumer'
+      ]
     environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
       - DB_NAME=pay_db
-      - DB_USER=pay_db
-      - DB_PASSWORD=pay_db
-      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - DB_USER=${DB_USER:-pay_db}
+      - DB_PASSWORD=${DB_PASSWORD:-pay_db}
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-change-me-in-production}
+      - DEBUG=${DEBUG:-True}
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
     depends_on:
       - postgres
       - rabbitmq
@@ -117,14 +149,17 @@ services:
   ship-service:
     build: ./ship-service
     ports:
-      - "8007:8000"
+      - '8007:8000'
     environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
       - DB_NAME=ship_db
-      - DB_USER=ship_db
-      - DB_PASSWORD=ship_db
-      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - DB_USER=${DB_USER:-ship_db}
+      - DB_PASSWORD=${DB_PASSWORD:-ship_db}
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-change-me-in-production}
+      - DEBUG=${DEBUG:-True}
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+      - ORDER_SERVICE_URL=${ORDER_SERVICE_URL:-http://order-service:8000}
     depends_on:
       - postgres
       - rabbitmq
@@ -132,14 +167,23 @@ services:
   ship-consumer:
     build: ./ship-service
     restart: always
-    command: ["/wait-for-postgres.sh", "postgres", "python", "manage.py", "run_consumer"]
+    command:
+      [
+        '/wait-for-postgres.sh',
+        'postgres',
+        'python',
+        'manage.py',
+        'run_consumer'
+      ]
     environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
       - DB_NAME=ship_db
-      - DB_USER=ship_db
-      - DB_PASSWORD=ship_db
-      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - DB_USER=${DB_USER:-ship_db}
+      - DB_PASSWORD=${DB_PASSWORD:-ship_db}
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-change-me-in-production}
+      - DEBUG=${DEBUG:-True}
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
     depends_on:
       - postgres
       - rabbitmq
@@ -147,14 +191,17 @@ services:
   inventory-service:
     build: ./inventory-service
     ports:
-      - "8013:8000"
+      - '8013:8000'
     environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
       - DB_NAME=inventory_db
-      - DB_USER=inventory_db
-      - DB_PASSWORD=inventory_db
-      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - DB_USER=${DB_USER:-inventory_db}
+      - DB_PASSWORD=${DB_PASSWORD:-inventory_db}
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-change-me-in-production}
+      - DEBUG=${DEBUG:-True}
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+      - BOOK_SERVICE_URL=${BOOK_SERVICE_URL:-http://book-service:8000}
     depends_on:
       - postgres
       - rabbitmq
@@ -162,101 +209,128 @@ services:
   inventory-consumer:
     build: ./inventory-service
     restart: always
-    command: ["/wait-for-postgres.sh", "postgres", "python", "manage.py", "run_consumer"]
+    command:
+      [
+        '/wait-for-postgres.sh',
+        'postgres',
+        'python',
+        'manage.py',
+        'run_consumer'
+      ]
     environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
       - DB_NAME=inventory_db
-      - DB_USER=inventory_db
-      - DB_PASSWORD=inventory_db
-      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - DB_USER=${DB_USER:-inventory_db}
+      - DB_PASSWORD=${DB_PASSWORD:-inventory_db}
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-change-me-in-production}
+      - DEBUG=${DEBUG:-True}
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+      - BOOK_SERVICE_URL=${BOOK_SERVICE_URL:-http://book-service:8000}
     depends_on:
       - postgres
       - rabbitmq
   comment-rate-service:
     build: ./comment-rate-service
     ports:
-      - "8008:8000"
+      - '8008:8000'
     environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
       - DB_NAME=comment_rate_db
-      - DB_USER=comment_rate_db
-      - DB_PASSWORD=comment_rate_db
+      - DB_USER=${DB_USER:-comment_rate_db}
+      - DB_PASSWORD=${DB_PASSWORD:-comment_rate_db}
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-change-me-in-production}
+      - DEBUG=${DEBUG:-True}
+      - BOOK_SERVICE_URL=${BOOK_SERVICE_URL:-http://book-service:8000}
     depends_on:
       - postgres
 
   manager-service:
     build: ./manager-service
     ports:
-      - "8009:8000"
+      - '8009:8000'
     environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
       - DB_NAME=manager_db
-      - DB_USER=manager_db
-      - DB_PASSWORD=manager_db
+      - DB_USER=${DB_USER:-manager_db}
+      - DB_PASSWORD=${DB_PASSWORD:-manager_db}
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-change-me-in-production}
+      - DEBUG=${DEBUG:-True}
     depends_on:
       - postgres
 
   catalog-service:
     build: ./catalog-service
     ports:
-      - "8010:8000"
+      - '8010:8000'
     environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
       - DB_NAME=catalog_db
-      - DB_USER=catalog_db
-      - DB_PASSWORD=catalog_db
+      - DB_USER=${DB_USER:-catalog_db}
+      - DB_PASSWORD=${DB_PASSWORD:-catalog_db}
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-change-me-in-production}
+      - DEBUG=${DEBUG:-True}
+      - CATALOG_SERVICE_URL=${CATALOG_SERVICE_URL:-http://catalog-service:8000}
     depends_on:
       - postgres
 
   recommender-ai-service:
     build: ./recommender-ai-service
     ports:
-      - "8011:8000"
+      - '8011:8000'
     environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
       - DB_NAME=recommender_db
-      - DB_USER=recommender_db
-      - DB_PASSWORD=recommender_db
+      - DB_USER=${DB_USER:-recommender_db}
+      - DB_PASSWORD=${DB_PASSWORD:-recommender_db}
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-change-me-in-production}
+      - DEBUG=${DEBUG:-True}
     depends_on:
       - postgres
 
   api-gateway:
     build: ./api-gateway
     ports:
-      - "8000:8000"
+      - '8000:8000'
     environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
       - DB_NAME=gateway_db
-      - DB_USER=gateway_db
-      - DB_PASSWORD=gateway_db
-      - JWT_SECRET=super-secret-key-for-bookstore
+      - DB_USER=${DB_USER:-gateway_db}
+      - DB_PASSWORD=${DB_PASSWORD:-gateway_db}
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-change-me-in-production}
+      - DEBUG=${DEBUG:-True}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
     depends_on:
       - postgres
 
   redis:
-    image: "redis:alpine"
+    image: 'redis:alpine'
     ports:
-      - "6379:6379"
+      - '6379:6379'
 
   image-service:
     build: ./image-service
     ports:
-      - "8012:8000"
+      - '8012:8000'
     depends_on:
       - redis
       - postgres
     environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
       - DB_NAME=image_db
-      - DB_USER=image_db
-      - DB_PASSWORD=image_db
+      - DB_USER=${DB_USER:-image_db}
+      - DB_PASSWORD=${DB_PASSWORD:-image_db}
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-change-me-in-production}
+      - DEBUG=${DEBUG:-True}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/0}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+      - BOOK_SERVICE_URL=${BOOK_SERVICE_URL:-http://book-service:8000}
 
   image-worker:
     build: ./image-service
@@ -265,11 +339,16 @@ services:
       - redis
       - postgres
     environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
       - DB_NAME=image_db
-      - DB_USER=image_db
-      - DB_PASSWORD=image_db
+      - DB_USER=${DB_USER:-image_db}
+      - DB_PASSWORD=${DB_PASSWORD:-image_db}
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-change-me-in-production}
+      - DEBUG=${DEBUG:-True}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/0}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+      - BOOK_SERVICE_URL=${BOOK_SERVICE_URL:-http://book-service:8000}
 
   postgres:
     image: postgres:15-alpine
@@ -278,7 +357,7 @@ services:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_MULTIPLE_DATABASES=customer_db,book_db,cart_db,staff_db,order_db,pay_db,ship_db,inventory_db,comment_rate_db,manager_db,catalog_db,recommender_db,gateway_db,image_db
     ports:
-      - "5432:5432"
+      - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres-init.sh:/docker-entrypoint-initdb.d/postgres-init.sh:ro
@@ -287,9 +366,8 @@ services:
     image: rabbitmq:3-management
     restart: always
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - '5672:5672'
+      - '15672:15672'
 
 volumes:
   postgres_data:
-

@@ -1,9 +1,10 @@
-﻿import requests
+﻿import os
+import requests
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-BOOK_SERVICE_URL = "http://book-service:8000"
+BOOK_SERVICE_URL = os.environ.get("BOOK_SERVICE_URL", "http://book-service:8000")
 
 
 class StaffBookListCreate(APIView):
