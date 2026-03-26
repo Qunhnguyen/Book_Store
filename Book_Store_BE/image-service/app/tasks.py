@@ -1,5 +1,6 @@
 import hashlib
 import logging
+import os
 from datetime import datetime, timezone
 
 import requests as http_requests
@@ -11,7 +12,7 @@ from .services.storage import StorageAdapter
 
 logger = logging.getLogger(__name__)
 
-BOOK_SERVICE_URL = 'http://book-service:8000'
+BOOK_SERVICE_URL = os.environ.get('BOOK_SERVICE_URL', 'http://book-service:8000')
 MAX_RETRIES = 3
 
 
